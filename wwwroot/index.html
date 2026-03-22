@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资讯中心 - 喜播集团</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+            background: #EDEDED;
+            color: #333;
+        }
+
+        .header {
+            background: #fff;
+            padding: 16px 20px;
+            text-align: center;
+            border-bottom: 1px solid #E0E0E0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .feed {
+            max-width: 680px;
+            margin: 12px auto;
+            padding: 0 10px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: box-shadow .2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, .1);
+        }
+
+        .card-body {
+            padding: 16px 18px;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #222;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .card-summary {
+            font-size: 14px;
+            color: #888;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-meta {
+            font-size: 12px;
+            color: #B2B2B2;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .empty-tip {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+            font-size: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>喜播资讯</h1>
+    </div>
+    <div class="feed" id="feed"></div>
+
+    <script>
+        async function loadNews() {
+            const feed = document.getElementById('feed');
+            try {
+                const res = await fetch('/api/news');
+                const data = await res.json();
+                if (!data || data.length === 0) {
+                    feed.innerHTML = '<div class="empty-tip">暂无资讯，敬请期待</div>';
+                    return;
+                }
+                feed.innerHTML = data.map(item => `
+                    <div class="card" onclick="location.href='/article.html?id=${item.id}'">
+                        <div class="card-body">
+                            <div class="card-title">${item.title}</div>
+                            <div class="card-summary">${item.summary || ''}</div>
+                            <div class="card-meta">
+                                <span>${item.author || '管理员'}</span>
+                                <span>${new Date(item.createdAt).toLocaleDateString('zh-CN')}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                feed.innerHTML = '<div class="empty-tip">加载失败，请稍后重试</div>';
+            }
+        }
+        loadNews();
+    </script>
+</body>
+
+</html>

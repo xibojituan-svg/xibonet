@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 喜播资讯</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .top-bar {
+            background: #1a1a2e;
+            color: #fff;
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .top-bar h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .top-bar button {
+            background: #e94560;
+            border: none;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+
+        /* 登录表单 */
+        .login-box {
+            max-width: 360px;
+            margin: 80px auto;
+            background: #fff;
+            padding: 40px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, .08);
+        }
+
+        .login-box h3 {
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 18px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .login-box .btn {
+            width: 100%;
+            padding: 10px;
+            background: #2563EB;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .login-box .btn:hover {
+            background: #1d4ed8;
+        }
+
+        .login-box .err {
+            color: #e94560;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* 管理面板 */
+        .panel {
+            display: none;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tabs button {
+            padding: 8px 20px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .tabs button.active {
+            background: #2563EB;
+            color: #fff;
+            border-color: #2563EB;
+        }
+
+        /* 编辑器 */
+        .editor {
+            background: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+        }
+
+        .editor input,
+        .editor textarea {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .editor textarea {
+            height: 260px;
+            resize: vertical;
+        }
+
+        .editor .btn-pub {
+            padding: 10px 28px;
+            background: #059669;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .editor .btn-pub:hover {
+            background: #047857;
+        }
+
+        /* 列表 */
+        .news-table {
+            width: 100%;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+        }
+
+        .news-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .news-table th {
+            background: #f8fafc;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+            color: #666;
+            border-bottom: 1px solid #eee;
+        }
+
+        .news-table td {
+            padding: 12px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .news-table .act-btn {
+            padding: 4px 10px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-right: 4px;
+        }
+
+        .news-table .act-btn.del {
+            color: #e94560;
+            border-color: #e94560;
+        }
+
+        .msg {
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .msg.ok {
+            background: #ecfdf5;
+            color: #059669;
+            display: block;
+        }
+
+        .msg.fail {
+            background: #fef2f2;
+            color: #dc2626;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 登录区域 -->
+    <div id="loginSection">
+        <div class="login-box">
+            <h3>管理员登录</h3>
+            <input type="text" id="username" placeholder="用户名" value="admin">
+            <input type="password" id="password" placeholder="密码">
+            <button class="btn" onclick="doLogin()">登 录</button>
+            <div class="err" id="loginErr">用户名或密码错误</div>
+        </div>
+    </div>
+
+    <!-- 管理面板 -->
+    <div id="adminPanel" class="panel">
+        <div class="top-bar">
+            <h2>📰 喜播资讯管理后台</h2>
+            <button onclick="doLogout()">退出登录</button>
+        </div>
+        <div class="container">
+            <div class="tabs">
+                <button class="active" onclick="switchTab('editor', this)">发布新闻</button>
+                <button onclick="switchTab('list', this)">新闻管理</button>
+            </div>
+
+            <div id="msgBox" class="msg"></div>
+
+            <!-- 发布/编辑 -->
+            <div id="editorTab" class="editor">
+                <input type="hidden" id="editId">
+                <input type="text" id="newsTitle" placeholder="文章标题">
+                <input type="text" id="newsSummary" placeholder="摘要（选填，显示在列表页）">
+                <input type="text" id="newsAuthor" placeholder="作者（默认 admin）" value="admin">
+                <input type="text" id="newsCover" placeholder="封面图URL（选填）">
+                <textarea id="newsContent" placeholder="正文内容（支持HTML标签，如 <p>段落</p> <strong>加粗</strong>）"></textarea>
+                <button class="btn-pub" onclick="submitNews()">发 布</button>
+                <button class="btn-pub" style="background:#6b7280;margin-left:8px;display:none" id="cancelEdit"
+                    onclick="cancelEdit()">取消编辑</button>
+            </div>
+
+            <!-- 列表 -->
+            <div id="listTab" style="display:none">
+                <div class="news-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>标题</th>
+                                <th>作者</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="newsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let TOKEN = localStorage.getItem('adminToken') || '';
+
+        // 如果有 Token 直接进管理面板
+        if (TOKEN) showPanel();
+
+        // -------- 登录 --------
+        async function doLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const res = await fetch('/api/auth/login', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            if (res.ok) {
+                const d = await res.json();
+                TOKEN = d.token;
+                localStorage.setItem('adminToken', TOKEN);
+                showPanel();
+            } else {
+                document.getElementById('loginErr').style.display = 'block';
+            }
+        }
+
+        function doLogout() {
+            TOKEN = '';
+            localStorage.removeItem('adminToken');
+            location.reload();
+        }
+
+        function showPanel() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'block';
+        }
+
+        // -------- Tab 切换 --------
+        function switchTab(tab, btn) {
+            document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('editorTab').style.display = tab === 'editor' ? 'block' : 'none';
+            document.getElementById('listTab').style.display = tab === 'list' ? 'block' : 'none';
+            if (tab === 'list') loadNewsList();
+        }
+
+        // -------- 发布/编辑 --------
+        async function submitNews() {
+            const editId = document.getElementById('editId').value;
+            const payload = {
+                title: document.getElementById('newsTitle').value,
+                summary: document.getElementById('newsSummary').value,
+                content: document.getElementById('newsContent').value,
+                author: document.getElementById('newsAuthor').value || 'admin',
+                coverUrl: document.getElementById('newsCover').value
+            };
+            if (!payload.title || !payload.content) { showMsg('标题和正文不能为空', false); return; }
+
+            const url = editId ? `/api/admin/news/${editId}` : '/api/admin/news';
+            const method = editId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method, headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                showMsg(editId ? '更新成功' : '发布成功', true);
+                clearEditor();
+            } else if (res.status === 401) {
+                showMsg('身份过期，请重新登录', false);
+                doLogout();
+            } else {
+                showMsg('操作失败', false);
+            }
+        }
+
+        function clearEditor() {
+            document.getElementById('editId').value = '';
+            document.getElementById('newsTitle').value = '';
+            document.getElementById('newsSummary').value = '';
+            document.getElementById('newsContent').value = '';
+            document.getElementById('newsAuthor').value = 'admin';
+            document.getElementById('newsCover').value = '';
+            document.getElementById('cancelEdit').style.display = 'none';
+        }
+
+        function cancelEdit() { clearEditor(); }
+
+        // -------- 列表 --------
+        async function loadNewsList() {
+            const res = await fetch('/api/news');
+            const data = await res.json();
+            const tbody = document.getElementById('newsTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:30px">暂无数据</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.title}</td>
+                    <td>${item.author || '-'}</td>
+                    <td>${new Date(item.createdAt).toLocaleString('zh-CN')}</td>
+                    <td>
+                        <button class="act-btn" onclick="editNews(${item.id})">编辑</button>
+                        <button class="act-btn del" onclick="deleteNews(${item.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // -------- 编辑 --------
+        async function editNews(id) {
+            const res = await fetch(`/api/news/${id}`);
+            if (!res.ok) return;
+            const a = await res.json();
+            document.getElementById('editId').value = a.id;
+            document.getElementById('newsTitle').value = a.title;
+            document.getElementById('newsSummary').value = a.summary || '';
+            document.getElementById('newsContent').value = a.content;
+            document.getElementById('newsAuthor').value = a.author || 'admin';
+            document.getElementById('newsCover').value = a.coverUrl || '';
+            document.getElementById('cancelEdit').style.display = 'inline-block';
+            // 切到编辑 Tab
+            switchTab('editor', document.querySelector('.tabs button'));
+            showMsg('正在编辑 ID=' + a.id + ' 的文章，修改后点击"发布"即保存', true);
+        }
+
+        // -------- 删除 --------
+        async function deleteNews(id) {
+            if (!confirm('确认删除这条新闻？')) return;
+            const res = await fetch(`/api/admin/news/${id}`, {
+                method: 'DELETE', headers: { 'Authorization': 'Bearer ' + TOKEN }
+            });
+            if (res.ok) {
+                showMsg('删除成功', true);
+                loadNewsList();
+            } else if (res.status === 401) {
+                showMsg('身份过期', false); doLogout();
+            }
+        }
+
+        // -------- 消息提示 --------
+        function showMsg(text, success) {
+            const box = document.getElementById('msgBox');
+            box.textContent = text;
+            box.className = 'msg ' + (success ? 'ok' : 'fail');
+            setTimeout(() => { box.style.display = 'none'; box.className = 'msg'; }, 3000);
+        }
+    </script>
+</body>
+
+</html>

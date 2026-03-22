@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章详情 - 喜播资讯</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+            background: #fff;
+            color: #333;
+        }
+
+        .article-wrap {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .article-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+
+        .article-meta {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .article-meta span {
+            margin-right: 16px;
+        }
+
+        .article-content {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #3e3e3e;
+            word-wrap: break-word;
+        }
+
+        .article-content p {
+            margin-bottom: 16px;
+        }
+
+        .article-content img {
+            max-width: 100%;
+            border-radius: 4px;
+            margin: 12px 0;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #576B95;
+            text-decoration: none;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 80px 0;
+            color: #999;
+            font-size: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="article-wrap">
+        <a href="/index.html" class="back-link">← 返回资讯列表</a>
+        <div id="content">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadArticle() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            if (!id) { document.getElementById('content').innerHTML = '<p>参数错误</p>'; return; }
+
+            try {
+                const res = await fetch(`/api/news/${id}`);
+                if (!res.ok) { document.getElementById('content').innerHTML = '<p>文章不存在</p>'; return; }
+                const a = await res.json();
+                document.title = a.title + ' - 喜播资讯';
+                document.getElementById('content').innerHTML = `
+                    <h1 class="article-title">${a.title}</h1>
+                    <div class="article-meta">
+                        <span>${a.author || '管理员'}</span>
+                        <span>${new Date(a.createdAt).toLocaleString('zh-CN')}</span>
+                    </div>
+                    <div class="article-content">${a.content}</div>
+                `;
+            } catch (e) {
+                document.getElementById('content').innerHTML = '<p>加载失败</p>';
+            }
+        }
+        loadArticle();
+    </script>
+</body>
+
+</html>
