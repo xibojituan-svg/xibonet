@@ -19,6 +19,7 @@ namespace XiboNetBackend.Models
         public int Id { get; set; }
         public string Username { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
+        public int RoleLevel { get; set; } = 4; // 1:L1 (决策层)  2:L2 (VP)  3:L3 (总监)  4:L4 (员工)
         public DateTime CreatedAt { get; set; }
     }
 }

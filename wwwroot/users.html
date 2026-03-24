@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人事干部权限管理 - DSTE系统</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+SC:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --border-glow: rgba(56, 189, 248, 0.3);
+            --accent: #38bdf8;
+            --accent-glow: #0ea5e9;
+            --text-main: #f8fafc;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: var(--accent);
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        th {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        select {
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid var(--accent);
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .alert {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            margin-bottom: 20px;
+            border: 1px solid var(--success);
+        }
+
+        /* 移动端自适应表格：转化为卡片流 */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
+            }
+
+            thead tr {
+                display: none;
+            }
+
+            tr {
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                margin-bottom: 20px;
+                padding: 10px;
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            td {
+                border: none;
+                position: relative;
+                padding-left: 35%;
+                text-align: right;
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                min-height: 40px;
+            }
+
+            td::before {
+                position: absolute;
+                left: 10px;
+                width: 30%;
+                text-align: left;
+                font-weight: 600;
+                color: var(--text-sub);
+                content: attr(data-label);
+            }
+
+            select {
+                width: 100%;
+                max-width: 200px;
+                /* 在手机上不要过宽 */
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>👥 干部与员工权限设定</h1>
+        <button class="btn" onclick="window.location.href='/dste.html'">🔙 返回沙盘</button>
+    </div>
+
+    <div id="msgBox" class="alert"></div>
+
+    <table id="userTable">
+        <thead>
+            <tr>
+                <th>账号ID</th>
+                <th>用户名 (域账号)</th>
+                <th>创建时间</th>
+                <th>层级序列 (权限管控区域)</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="5">加载中...系统验证 L1 管理员身份...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        const token = localStorage.getItem('dste_token');
+        if (!token) {
+            window.location.href = '/dste.html';
+        }
+
+        // 1(决策层L1), 2(战略执行层L2), 3(战术落地层L3), 4(战斗层L4)
+        const roleNames = {
+            1: "L1 (集团决策层 - 看到全部财务机密)",
+            2: "L2 (VP高管 - 可看各部门宏观进度)",
+            3: "L3 (部门总监 - 本部所有人员与动作)",
+            4: "L4 (基层员工 - 仅看己方KPI和公开OKR)"
+        };
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/dste/users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.status === 401 || res.status === 403) {
+                    document.querySelector('tbody').innerHTML = "<tr><td colspan='5' style='color:#ef4444;'>🚫 鉴权失败！只有当前级别判定为 L1 的超级高管才可以访问本页面。</td></tr>";
+                    return;
+                }
+
+                const users = await res.json();
+                renderTable(users);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderTable(users) {
+            const tbody = document.querySelector('tbody');
+            tbody.innerHTML = users.map(u => {
+                let options = [1, 2, 3, 4].map(r =>
+                    `<option value="${r}" ${u.roleLevel === r ? 'selected' : ''}>${roleNames[r]}</option>`
+                ).join('');
+
+                return `
+                <tr>
+                    <td data-label="账号ID">#${u.id}</td>
+                    <td data-label="用户名" style="font-weight:bold; color:var(--accent);">${u.username}</td>
+                    <td data-label="创建时间">${new Date(u.createdAt).toLocaleDateString()}</td>
+                    <td data-label="层级序列">
+                        <select id="sel_${u.id}">
+                            ${options}
+                        </select>
+                    </td>
+                    <td data-label="操作">
+                        <button class="btn" style="width:100%" onclick="saveRole(${u.id})">💾 确认调级</button>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        async function saveRole(userId) {
+            const selectedRole = parseInt(document.getElementById('sel_' + userId).value);
+
+            try {
+                const res = await fetch(`/api/dste/users/${userId}/role`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(selectedRole)
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    const msgBox = document.getElementById('msgBox');
+                    msgBox.innerText = data.message;
+                    msgBox.style.display = 'block';
+                    setTimeout(() => msgBox.style.display = 'none', 3000);
+                } else {
+                    alert('越权操作拦截: ' + data.message);
+                }
+            } catch (e) {
+                alert('网络异常');
+            }
+        }
+
+        window.onload = loadUsers;
+    </script>
+</body>
+
+</html>

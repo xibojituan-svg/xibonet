@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xibo DSTE 战略指北针 (执行看板)</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+SC:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --card-bg: rgba(51, 65, 85, 0.5);
+            --border-glow: rgba(56, 189, 248, 0.3);
+            --accent: #38bdf8;
+            --accent-glow: #0ea5e9;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            background: radial-gradient(circle at top right, #1e1b4b, var(--bg-dark), #020617);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--accent);
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .role-selector {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover,
+        .btn.active {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .btn-seed {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border: none;
+            color: white;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        main {
+            padding: 40px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.8s ease forwards;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 8px;
+            height: 24px;
+            background: var(--accent);
+            border-radius: 4px;
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        /* 策略卡片 */
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--border-glow);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            color: #fff;
+            font-size: 18px;
+        }
+
+        .card p {
+            color: var(--text-sub);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .card .confidential {
+            font-family: monospace;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            letter-spacing: 1px;
+            border: 1px dashed var(--danger);
+        }
+
+        .card .revealed {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px dashed var(--success);
+        }
+
+        /* BSC 列表 */
+        .bsc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .bsc-info {
+            flex: 1;
+        }
+
+        .bsc-dept {
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 10px;
+            color: #e2e8f0;
+        }
+
+        .bsc-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 8px 0;
+        }
+
+        .bsc-metrics {
+            text-align: right;
+            min-width: 250px;
+        }
+
+        .metric-glow {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-main);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        /* 进度条样式 (员工层级看到) */
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-glow));
+            border-radius: 4px;
+            transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbd38d;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--accent);
+            font-size: 20px;
+            display: none;
+        }
+
+        .fendouzhe-badge {
+            background: linear-gradient(45deg, #f59e0b, #d97706);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+            margin-left: 10px;
+            display: inline-block;
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* 登录遮罩层 */
+        #loginOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg-dark);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-box {
+            background: var(--panel-bg);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 350px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            box-sizing: border-box;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+            }
+
+            100% {
+                box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 移动端自适应适配 */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 15px;
+                gap: 15px;
+            }
+
+            .role-selector {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .role-selector .btn {
+                margin: 0 !important;
+                /* 覆盖内联的边距 */
+                font-size: 13px;
+                padding: 6px 12px;
+            }
+
+            main {
+                padding: 15px;
+                gap: 20px;
+            }
+
+            .glass-panel {
+                padding: 20px;
+                border-radius: 12px;
+            }
+
+            .section-title {
+                font-size: 18px;
+            }
+
+            .bsc-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .bsc-metrics {
+                text-align: left !important;
+                width: 100%;
+                min-width: auto;
+            }
+
+            .login-box {
+                width: 90%;
+                padding: 25px;
+            }
+
+            .metric-glow {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 登录拦截层 -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2 style="color:var(--accent); margin-top:0;">系统安全验证</h2>
+            <p style="color:var(--text-sub); font-size:14px; margin-bottom: 25px;">请核实干部权限序列登录</p>
+            <input type="text" id="username" placeholder="输入域账号 (如: admin, vp, employee)" autocomplete="off">
+            <input type="password" id="password" placeholder="密码 (测试体验统一输入 password123)" value="password123">
+            <button class="btn active" onclick="doLogin()">🚀 登入战略作战指挥中心</button>
+        </div>
+    </div>
+
+    <!-- 主界面区，默认隐藏 -->
+    <div id="mainContent" class="hidden">
+        <header>
+            <div class="logo">DSTE · 战情沙盘</div>
+            <div class="role-selector">
+                <span style="color: var(--text-sub);">登录账号: <strong id="currentUser"
+                        style="color:white">--</strong></span>
+                <span id="roleLabel" class="fendouzhe-badge"
+                    style="background:var(--success); box-shadow:none;">体系判定中...</span>
+
+                <!-- 权限限制按钮 (仅L1显示) -->
+                <button class="btn btn-seed hidden" id="btnMgmt" onclick="window.location.href='/users.html'"
+                    style="margin-left: 30px;">👥 人事干部权限管理</button>
+                <button class="btn btn-seed hidden" id="btnAdminDste" onclick="window.location.href='/admin_dste.html'"
+                    style="margin-left: 10px; background:linear-gradient(135deg, #f59e0b, #d97706); border-color:#d97706;">👑
+                    战略维护</button>
+                <button class="btn btn-seed hidden" id="btnSeed" onclick="seedData()" style="margin-left: 10px;">🚀
+                    注入测试数据</button>
+                <button class="btn hidden" id="btnClear" onclick="clearData()"
+                    style="color:var(--danger); border-color:var(--danger); margin-left: 10px;">🗑️ 清空沙盘图</button>
+
+                <button class="btn" onclick="logout()" style="margin-left: 15px;">退出</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="warning-box" id="infoBox">
+                💡 系统已对当前登陆人的职级范围自动响应。
+            </div>
+
+            <!-- 战略层面 (SP) -->
+            <section class="glass-panel">
+                <h2 class="section-title">集团顶层战略设计 (SP/BP)</h2>
+                <div class="strategy-grid" id="spContainer">
+                    <div style="color: var(--text-sub)">暂无战略数据，请点击右上方初始化按钮...</div>
+                </div>
+            </section>
+
+            <!-- 战役指标层面 (BSC) -->
+            <section class="glass-panel">
+                <h2 class="section-title">平衡计分卡与战略战役 (BSC & GSA)</h2>
+                <div id="bscContainer">
+                    <!-- BSC数据动态生成在此 -->
+                </div>
+            </section>
+
+            <!-- OKR 队伍打分与奋斗者雷达 -->
+            <section class="glass-panel">
+                <h2 class="section-title">全员协同 OKR (透明) 与 奋斗者雷达探测</h2>
+                <div class="strategy-grid" id="okrContainer">
+                    <!-- OKR数据动态生成在此 -->
+                </div>
+            </section>
+
+            <!-- KPI 个人算账与评级 -->
+            <section class="glass-panel">
+                <h2 class="section-title">个人绩效算账 (KPI) - 直属组织保密</h2>
+                <div id="kpiContainer">
+                    <!-- KPI数据动态生成在此 -->
+                </div>
+            </section>
+    </div> <!-- end mainContent -->
+
+    <div id="loading">📡 DSTE 系统通讯中...</div>
+
+    <script>
+        let myToken = localStorage.getItem('dste_token');
+        let myUser = localStorage.getItem('dste_user');
+
+        // 界面加载后检查令牌
+        window.onload = () => {
+            if (myToken) {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('mainContent').classList.remove('hidden');
+                document.getElementById('currentUser').innerText = myUser;
+                loadDsteData();
+            }
+        };
+
+        function logout() {
+            localStorage.removeItem('dste_token');
+            localStorage.removeItem('dste_user');
+            localStorage.removeItem('dste_role');
+            window.location.reload();
+        }
+
+        async function doLogin() {
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value.trim();
+            if (!u || !p) return alert("账号密码必填");
+
+            showLoading(true);
+            try {
+                // 如果没有注册过的测试号，帮你挂个底 (可选)
+                await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Username: u, Password: p })
+                });
+
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Username: u, Password: p })
+                });
+
+                if (res.status === 401) {
+                    alert('账号或密码不正确！(测试库的正确密码均为 password123，如果依旧报错请从页面重新注册其他新名字)');
+                } else {
+                    const data = await res.json();
+                    localStorage.setItem('dste_token', data.token);
+                    localStorage.setItem('dste_user', data.userInfo.username);
+                    localStorage.setItem('dste_role', data.userInfo.roleLevel || 4);
+                    window.location.reload();
+                }
+            } catch (e) {
+                alert("登录系统出错, 通讯断开");
+            }
+            showLoading(false);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        async function seedData() {
+            showLoading(true);
+            try {
+                const res = await fetch('/api/dste/seed', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message);
+                loadDsteData();
+            } catch (e) {
+                alert('自动生成失败，请确认后端已运行！');
+            }
+            showLoading(false);
+        }
+
+        async function clearData() {
+            if (!confirm("确定要销毁当前所有的沙盘战略测试数据吗？")) return;
+            showLoading(true);
+            try {
+                const res = await fetch('/api/dste/clear', { method: 'DELETE' });
+                const data = await res.json();
+                alert(data.message);
+                loadDsteData();
+            } catch (e) {
+                alert('清空失败！');
+            }
+            showLoading(false);
+        }
+
+        async function loadDsteData() {
+            if (!myToken) return;
+            showLoading(true);
+
+            let myRole = parseInt(localStorage.getItem('dste_role') || "4");
+
+            if (myRole === 1) {
+                document.getElementById('btnMgmt').classList.remove('hidden');
+                document.getElementById('btnAdminDste').classList.remove('hidden');
+                document.getElementById('btnSeed').classList.remove('hidden');
+                document.getElementById('btnClear').classList.remove('hidden');
+                document.getElementById('roleLabel').innerText = "当前系统密级: L1 (管理高层)";
+            } else {
+                document.getElementById('btnMgmt').classList.add('hidden');
+                document.getElementById('btnAdminDste').classList.add('hidden');
+                document.getElementById('btnSeed').classList.add('hidden');
+                document.getElementById('btnClear').classList.add('hidden');
+                document.getElementById('roleLabel').innerText = "当前系统密级: L" + myRole + " (员工)";
+            }
+
+            const headers = { 'Authorization': `Bearer ${myToken}` };
+
+            try {
+                // 1. 获取顶层战略
+                const spRes = await fetch('/api/dste/strategy', { headers });
+                const spList = await spRes.json();
+
+                renderStrategy(spList);
+
+                if (spList.length > 0) {
+                    // 2. 默认拉取第一个战略的 BSC 战役拆解
+                    const bscRes = await fetch(`/api/dste/bsc/${spList[0].id}`, { headers });
+                    const bscList = await bscRes.json();
+                    renderBsc(bscList);
+                }
+
+                // 3. 拉取 OKR 奋斗者打分雷达
+                const okrRes = await fetch('/api/dste/okr_talent', { headers });
+                const okrList = await okrRes.json();
+                renderOkr(okrList);
+
+                // 4. 拉取个人 KPI 算账
+                const kpiRes = await fetch('/api/dste/kpi', { headers });
+                const kpiList = await kpiRes.json();
+                renderKpi(kpiList);
+
+            } catch (e) {
+                console.error("拿不到数据", e);
+            }
+
+            showLoading(false);
+        }
+
+        function renderStrategy(list) {
+            const container = document.getElementById('spContainer');
+            if (!list || list.length === 0) return;
+
+            container.innerHTML = list.map(sp => {
+                const isSecret = sp.financialGoalDisplay.includes("***") || sp.financialGoalDisplay.includes("机密");
+                const styleClass = isSecret ? "confidential" : "confidential revealed";
+                const label = isSecret ? "📵 L1 级核心机密 (已脱敏拦截)" : "🔓 核心底牌 (L1鉴权通过)";
+
+                return `
+                <div class="card">
+                    <span style="color:var(--accent); font-weight:800; font-size:24px;">${sp.planYear} 年战略航盘</span>
+                    <p style="margin-top:15px;"><strong>核心愿景:</strong> ${sp.vision}</p>
+                    <p><strong>价值观铁律:</strong> ${sp.coreValues}</p>
+                    <p style="color:#cbd5e1;"><strong>年度攻坚方向 (全员公开):</strong> <br/>${sp.publicDirection}</p>
+                    
+                    <div style="margin-top: 20px;">
+                        <span style="font-size:12px; color:var(--text-sub);">${label}</span>
+                        <div class="${styleClass}">
+                            ${sp.financialGoalDisplay}
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function renderBsc(list) {
+            const container = document.getElementById('bscContainer');
+            if (!list || list.length === 0) {
+                container.innerHTML = "<div style='color: var(--text-sub)'>该战略暂无下钻的计分卡战役...</div>";
+                return;
+            }
+
+            container.innerHTML = list.map(bsc => {
+                const isConfidential = bsc.targetValueDisplay.includes("***");
+
+                // 如果是脱敏的进度提取数字
+                let progressHtml = "";
+                let metricsHtml = "";
+
+                if (isConfidential) {
+                    const pctMatch = bsc.currentValueDisplay.match(/([0-9.]+)%/);
+                    const pct = pctMatch ? pctMatch[1] : 0;
+                    metricsHtml = `
+                        <div style="font-size:14px; color:var(--text-sub); margin-bottom: 5px;">战役任务进展</div>
+                        <div class="metric-glow" style="color: var(--accent);">${bsc.currentValueDisplay}</div>
+                        <div class="progress-container">
+                            <div class="progress-fill" style="width: ${pct}%"></div>
+                        </div>
+                    `;
+                } else {
+                    metricsHtml = `
+                        <div style="display:flex; justify-content:flex-end; gap: 20px;">
+                            <div>
+                                <div style="font-size:12px; color:var(--text-sub);">当前攻克</div>
+                                <div class="metric-glow" style="color: var(--success);">${bsc.currentValueDisplay}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:12px; color:var(--text-sub);">总体战役目标</div>
+                                <div class="metric-glow">${bsc.targetValueDisplay}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return `
+                <div class="bsc-item" style="border-left-color: ${isConfidential ? 'var(--text-sub)' : 'var(--accent)'}">
+                    <div class="bsc-info">
+                        <span class="bsc-dept">${bsc.departmentName}</span>
+                        <span style="font-size:12px; color:var(--accent); border:1px solid var(--accent); padding:2px 6px; border-radius:10px;">${bsc.perspective} 视角</span>
+                        <div class="bsc-title">${bsc.objective}</div>
+                        <div style="font-size:12px; color:var(--text-sub); margin-top:5px;">
+                            保密等级管控节点: L${bsc.confidentialityLevel} (系统鉴权自动拦截)
+                        </div>
+                    </div>
+                    <div class="bsc-metrics">
+                        ${metricsHtml}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function renderOkr(list) {
+            const container = document.getElementById('okrContainer');
+            if (!list || list.length === 0) { container.innerHTML = "<div style='color:var(--text-sub)'>无数据</div>"; return; }
+
+            container.innerHTML = list.map(okr => {
+                const badge = okr.isFendouzhe ? '<span class="fendouzhe-badge">💎 核心奋斗者</span>' : '';
+                return `
+                <div class="card">
+                    <div style="font-size:12px; color:var(--accent); margin-bottom:5px;">[牵引战役] ${okr.alignment}</div>
+                    <h3 style="margin:5px 0;">O: ${okr.objective}</h3>
+                    <p style="margin:5px 0 15px 0; color:var(--text-main)">${okr.keyResults}</p>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:var(--text-sub)">承接人：<strong>${okr.ownerName}</strong> ${badge}</span>
+                        <div style="width:100px; text-align:right;">
+                            <span style="color:var(--accent); font-weight:bold;">${okr.progressPercent}%</span>
+                        </div>
+                    </div>
+                    <div class="progress-container"><div class="progress-fill" style="width: ${okr.progressPercent}%"></div></div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function renderKpi(list) {
+            const container = document.getElementById('kpiContainer');
+            if (!list || list.length === 0) { container.innerHTML = "<div style='color:var(--text-sub)'>您的考核周期内目前无锁定数据。</div>"; return; }
+
+            container.innerHTML = list.map(kpi => {
+                let gradeColor = "var(--text-main)";
+                if (kpi.grade.includes("A")) gradeColor = "var(--success)";
+                if (kpi.grade.includes("D")) gradeColor = "var(--danger)";
+                if (kpi.grade.includes("B") || kpi.grade.includes("C")) gradeColor = "#fbd38d";
+
+                return `
+                <div class="bsc-item" style="border-left-color: ${gradeColor}">
+                    <div class="bsc-info">
+                        <span class="bsc-dept">被考核人: ${kpi.ownerName}</span>
+                        <span style="font-size:12px; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:10px;">${kpi.evaluationPeriod}</span>
+                        <div class="bsc-title">${kpi.indicatorName}</div>
+                        <div style="font-size:13px; color:var(--text-sub); margin-top:5px;">组织建议: ${kpi.suggestion}</div>
+                    </div>
+                    <div class="bsc-metrics" style="text-align:right;">
+                        <div style="font-size:20px; font-weight:800; color:${gradeColor}; margin-bottom: 5px;">${kpi.grade}</div>
+                        <div style="font-size:12px; color:var(--text-sub);">
+                            达成: <span style="color:#fff">${kpi.actualScoreDisplay}</span> / 目标: ${kpi.targetScoreDisplay}
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+
+</html>

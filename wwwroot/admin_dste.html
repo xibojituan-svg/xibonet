@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>喜播 DSTE 内容管理后台 - 最高指挥中心</title>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--bg-color), #000000);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+            overflow-x: auto;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        input,
+        select {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👑 顶级机密：DSTE 底层战略兵棋库维护中心</h1>
+            <div>
+                <button class="btn btn-outline" onclick="location.href='dste.html'">返回前台指挥舱</button>
+            </div>
+        </div>
+
+        <!-- 战略规划 SP 管理 -->
+        <div class="card">
+            <h2>
+                Strategic Plan (SP) 集团年度战略
+                <button class="btn" onclick="openModal('spModal')">+ 新增年度战略</button>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>年份</th>
+                        <th>战略愿景</th>
+                        <th>公开战略方向</th>
+                        <th>绝密财务红线目标</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="spTableBody">
+                    <tr>
+                        <td colspan="5" style="text-align: center;">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 计分卡 BSC 管理 -->
+        <div class="card">
+            <h2>
+                Balanced Scorecard (BSC) 部门计分卡
+                <button class="btn" onclick="openModal('bscModal')">+ 新增部门指标</button>
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>关联SP ID</th>
+                        <th>部门</th>
+                        <th>视角</th>
+                        <th>核心指标名称</th>
+                        <th>目标设定</th>
+                        <th>当前进度</th>
+                        <th>保密级别</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="bscTableBody">
+                    <tr>
+                        <td colspan="8" style="text-align: center;">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SP Modal -->
+    <div class="modal" id="spModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="spModalTitle">新增战略 (SP)</h3>
+                <button class="btn-danger" style="padding: 4px 8px;" onclick="closeModal('spModal')">X</button>
+            </div>
+            <form id="spForm" onsubmit="saveSp(event)">
+                <input type="hidden" id="spId">
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>规划年份</label>
+                    <input type="number" id="spYear" required placeholder="如: 2026">
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>战略愿景 (Vision)</label>
+                    <input type="text" id="spVision" required placeholder="例：成为最受信赖的平台">
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>核心价值观 (Core Values)</label>
+                    <input type="text" id="spValues" required>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>公开战略全向 (Public Direction)</label>
+                    <input type="text" id="spDirection" required>
+                </div>
+                <div class="form-group" style="margin-bottom:20px;">
+                    <label>机密财务目标 (仅L1可见)</label>
+                    <input type="number" id="spFinance" required step="0.01">
+                </div>
+                <div style="text-align: right;">
+                    <button type="submit" class="btn">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BSC Modal -->
+    <div class="modal" id="bscModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bscModalTitle">新增计分卡指标 (BSC)</h3>
+                <button class="btn-danger" style="padding: 4px 8px;" onclick="closeModal('bscModal')">X</button>
+            </div>
+            <form id="bscForm" onsubmit="saveBsc(event)">
+                <input type="hidden" id="bscId">
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>归属的战略SP ID</label>
+                    <input type="number" id="bscSpId" required>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>负责部门</label>
+                    <input type="text" id="bscDept" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>计分卡视角</label>
+                        <select id="bscPerspective">
+                            <option value="财务">财务</option>
+                            <option value="客户">客户与市场</option>
+                            <option value="内部流程">内部运营流程</option>
+                            <option value="学习与成长">学习与成长</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>具体量化指标</label>
+                    <input type="text" id="bscObj" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>目标值</label>
+                        <input type="number" id="bscTarget" required step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>当前进展值</label>
+                        <input type="number" id="bscCurrent" required step="0.01">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:20px;">
+                    <label>保密级别 (1=L1专属；2=L1/L2可见；3=公开下发)</label>
+                    <input type="number" id="bscConf" required min="1" max="4" value="2">
+                </div>
+                <div style="text-align: right;">
+                    <button type="submit" class="btn">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const endpoint = '/api/admin/dste';
+
+        function getAuthHeaders() {
+            const token = localStorage.getItem('dste_token');
+            if (!token) {
+                alert("无权访问：凭证遗失。请返回核心工作台完成极客安全验证。");
+                location.href = 'dste.html';
+            }
+            return {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        async function apiFetch(url, options = {}) {
+            options.headers = getAuthHeaders();
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                alert("拦截警告：L1 越权检测。您的身份不是最高决策管理大军。");
+                location.href = 'dste.html';
+                return null;
+            }
+            if (!res.ok) {
+                alert("发生网络错误：" + res.status);
+                return null;
+            }
+            return res.json();
+        }
+
+        async function loadData() {
+            // Load SP
+            const sps = await apiFetch(`${endpoint}/sp`);
+            if (sps) {
+                const tbody = document.getElementById('spTableBody');
+                tbody.innerHTML = '';
+                sps.forEach(sp => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>[ID:${sp.id}] ${sp.planYear}</td>
+                            <td>${sp.vision}</td>
+                            <td>${sp.publicDirection}</td>
+                            <td style="color:var(--warning)">¥ ${sp.confidentialFinancialGoal.toLocaleString()}</td>
+                            <td>
+                                <button class="btn btn-outline" style="padding:4px 8px; font-size:12px;" onclick='editSp(${JSON.stringify(sp)})'>编辑</button>
+                                <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteSp(${sp.id})">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // Load BSC
+            const bscs = await apiFetch(`${endpoint}/bsc`);
+            if (bscs) {
+                const tbody = document.getElementById('bscTableBody');
+                tbody.innerHTML = '';
+                bscs.forEach(bsc => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>SP-${bsc.strategicPlanId}</td>
+                            <td><span style="background:rgba(255,255,255,0.1);padding:4px 8px;border-radius:4px">${bsc.departmentName}</span></td>
+                            <td style="color:#38bdf8">${bsc.perspective}</td>
+                            <td>${bsc.objective}</td>
+                            <td>${bsc.targetValue}</td>
+                            <td>${bsc.currentValue}</td>
+                            <td>L${bsc.confidentialityLevel}</td>
+                            <td>
+                                <button class="btn btn-outline" style="padding:4px 8px; font-size:12px;" onclick='editBsc(${JSON.stringify(bsc)})'>编辑</button>
+                                <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteBsc(${bsc.id})">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // --- SP ---
+        function editSp(sp) {
+            document.getElementById('spModalTitle').innerText = "编辑战略 (SP)";
+            document.getElementById('spId').value = sp.id;
+            document.getElementById('spYear').value = sp.planYear;
+            document.getElementById('spVision').value = sp.vision;
+            document.getElementById('spValues').value = sp.coreValues;
+            document.getElementById('spDirection').value = sp.publicDirection;
+            document.getElementById('spFinance').value = sp.confidentialFinancialGoal;
+            openModal('spModal');
+        }
+
+        async function saveSp(e) {
+            e.preventDefault();
+            const payload = {
+                planYear: parseInt(document.getElementById('spYear').value),
+                vision: document.getElementById('spVision').value,
+                coreValues: document.getElementById('spValues').value,
+                publicDirection: document.getElementById('spDirection').value,
+                confidentialFinancialGoal: parseFloat(document.getElementById('spFinance').value)
+            };
+            const id = document.getElementById('spId').value;
+            const url = id ? `${endpoint}/sp/${id}` : `${endpoint}/sp`;
+            const method = id ? 'PUT' : 'POST';
+
+            const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
+            if (res) {
+                closeModal('spModal');
+                loadData();
+                document.getElementById('spForm').reset();
+                document.getElementById('spId').value = "";
+            }
+        }
+
+        async function deleteSp(id) {
+            if (!confirm("确定要删除该战略指令吗？这将影响极大的业务走向！")) return;
+            const res = await apiFetch(`${endpoint}/sp/${id}`, { method: 'DELETE' });
+            if (res) loadData();
+        }
+
+        // --- BSC ---
+        function editBsc(bsc) {
+            document.getElementById('bscModalTitle').innerText = "编辑计分卡指标 (BSC)";
+            document.getElementById('bscId').value = bsc.id;
+            document.getElementById('bscSpId').value = bsc.strategicPlanId;
+            document.getElementById('bscDept').value = bsc.departmentName;
+            document.getElementById('bscPerspective').value = bsc.perspective;
+            document.getElementById('bscObj').value = bsc.objective;
+            document.getElementById('bscTarget').value = bsc.targetValue;
+            document.getElementById('bscCurrent').value = bsc.currentValue;
+            document.getElementById('bscConf').value = bsc.confidentialityLevel;
+            openModal('bscModal');
+        }
+
+        async function saveBsc(e) {
+            e.preventDefault();
+            const payload = {
+                strategicPlanId: parseInt(document.getElementById('bscSpId').value),
+                departmentName: document.getElementById('bscDept').value,
+                perspective: document.getElementById('bscPerspective').value,
+                objective: document.getElementById('bscObj').value,
+                targetValue: parseFloat(document.getElementById('bscTarget').value),
+                currentValue: parseFloat(document.getElementById('bscCurrent').value),
+                confidentialityLevel: parseInt(document.getElementById('bscConf').value)
+            };
+            const id = document.getElementById('bscId').value;
+            const url = id ? `${endpoint}/bsc/${id}` : `${endpoint}/bsc`;
+            const method = id ? 'PUT' : 'POST';
+
+            const res = await apiFetch(url, { method, body: JSON.stringify(payload) });
+            if (res) {
+                closeModal('bscModal');
+                loadData();
+                document.getElementById('bscForm').reset();
+                document.getElementById('bscId').value = "";
+            }
+        }
+
+        async function deleteBsc(id) {
+            if (!confirm("确定要删除这项量化指标吗？")) return;
+            const res = await apiFetch(`${endpoint}/bsc/${id}`, { method: 'DELETE' });
+            if (res) loadData();
+        }
+
+        // Init
+        loadData();
+    </script>
+</body>
+
+</html>
