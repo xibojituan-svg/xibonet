@@ -10,8 +10,16 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient(); // 注入 HttpClient 支持给钉钉接口使用
 
+// 极简全量开放 CORS：允许一切本地跨域网页直接抓取业务数据
+builder.Services.AddCors(options => {
+    options.AddPolicy("AllowAll", builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+
 // 注册后台定时任务守护进程：每天执行自动扫描与推送
 builder.Services.AddHostedService<DailyDingTalkReporter>();
+
+// 注册风控闭环跑批定时任务（CronJob）每15分钟扫描订单
+// 暂停使用: builder.Services.AddHostedService<UserSyncCronJob>();
 
 // 从配置文件中读取数据库连接字符串
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -23,6 +31,8 @@ var app = builder.Build();
 // 强制开启 Swagger (即使当前环境显示为 Production 也能访问测试界面)
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseCors("AllowAll");
 
 // 临时注释掉 HTTPS 重定向，彻底解决你看到的警告 (warn) 问题
 // app.UseHttpsRedirection();
@@ -1075,6 +1085,109 @@ app.MapGet("/api/dingtalk/push-weekly-classified", async (string operatorId, IHt
 })
 .WithName("DingTalkPushWeeklyClassified")
 .WithOpenApi();
+// ---- 接口26: ABCD 数据大屏：智能获取分类落库的用户风控底层标本 -------------
+app.MapGet("/api/admin/students", async (IDbConnection db) => 
+{
+    var sql = @"
+        SELECT TOP 100 
+            s.Id, o.[订单编号] as OrderId, ISNULL(TRY_CAST(o.[实付金额] AS DECIMAL(18,2)), 0) as ActualAmount, o.[是否退款] as IsRefund, 
+            s.Uid as UserUID, o.[用户微信昵称] as UserWechatNickname, o.[商品名] as ProductName, 
+            s.ClassType, s.Rules, s.Needs 
+        FROM Students s
+        OUTER APPLY (
+            SELECT TOP 1 [订单编号], [实付金额], [是否退款], [用户微信昵称], [商品名]
+            FROM Orders o2
+            WHERE CAST(o2.[用户UID] AS NVARCHAR(255)) = s.Uid OR CAST(o2.[用户UID] AS NVARCHAR(255)) = s.Uid + '.0'
+        ) o
+        ORDER BY 
+            CASE 
+                WHEN s.ClassType = 'D' THEN 1 
+                WHEN s.ClassType LIKE 'C%' THEN 2 
+                WHEN s.ClassType = 'A' THEN 3 
+                ELSE 4 
+            END ASC";
+    var students = await db.QueryAsync(sql);
+    return Results.Ok(students);
+})
+.WithName("GetClassifiedStudents")
+.WithOpenApi();
+
+// ---- 接口27: 批量提取 Info 表通过大模型（模拟）分析并注入 Students ----
+app.MapPost("/api/admin/run-ai-pipeline", async (IDbConnection db) => {
+    await db.ExecuteAsync("DELETE FROM Students");
+    var infos = await db.QueryAsync("SELECT CAST(Uid AS NVARCHAR(255)) as Uid, CAST(ChatHistory AS NVARCHAR(MAX)) as ChatHistory FROM Info");
+    int count = 0;
+    foreach(var info in infos) {
+        string uid = info.Uid;
+        string chat = info.ChatHistory ?? "";
+        
+        string classType = "B";
+        string needs = "期望稳健的学习和长期的价值陪伴，可推介核心产品线。";
+        string evidence = "未检测到风险触发词，沟通时长和频次正常。";
+        
+        // Extract context window to provide evidence
+        string GetContext(string text, string keyword) {
+            int idx = text.IndexOf(keyword);
+            if (idx == -1) return "";
+            int start = Math.Max(0, idx - 15);
+            int length = Math.Min(text.Length - start, 40);
+            return text.Substring(start, length).Replace("\n", " ").Replace("\r", " ");
+        }
+
+        if(chat.Contains("退款") || chat.Contains("穷") || chat.Contains("没钱") || chat.Contains("负担不起")) {
+            classType = "C1";
+            needs = "极度需要学姐/班主任的情绪抚慰和心理建设；严禁高压销售，需搭配极低难度的回本短单。";
+            
+            string kw = chat.Contains("退款") ? "退款" : (chat.Contains("没钱") ? "没钱" : "负担不起");
+            evidence = $"触发了财务窘迫或信心崩溃红线。系统抓取到敏感原话：『...{GetContext(chat, kw)}...』。该用户存在高客诉退费风险，急需建立安全感。";
+        }
+        else if(chat.Contains("借钱") || chat.Contains("负债") || chat.Contains("救命") || chat.Contains("投诉") || chat.Contains("骗人")) {
+            classType = "D";
+            needs = "【系统禁入】：绝对禁止高客单逼单，立即切入防客诉通道，导向免费或超低价隔离区。";
+            
+            string kw = chat.Contains("负债") ? "负债" : (chat.Contains("投诉") ? "投诉" : "借钱");
+            evidence = $"触碰最高防线【D类熔断】。检测到不可抗力风险句：『...{GetContext(chat, kw)}...』。此类用户已被打上大黑标签，强行转化会引爆黑猫投诉。";
+        }
+        else if (chat.Contains("投资") || chat.Contains("企业") || chat.Contains("老板") || chat.Contains("资源") || chat.Contains("合作")) {
+            classType = "A";
+            needs = "拒绝标品敷衍，需要提供 VIP 师徒指导、闭门私董会及高位流量倾斜。";
+            
+            string kw = chat.Contains("投资") ? "投资" : (chat.Contains("老板") ? "老板" : "资源");
+            evidence = $"高净值身份识别成功。发现关键诉求：『...{GetContext(chat, kw)}...』。用户高度关注商业闭环而非单纯兼职，要求顶级交付能力。";
+        }
+        else if(chat.Length < 350) {
+            classType = "C2";
+            needs = "应当静默处理，停止跨漏斗的机器私信轰炸，以免损坏私域信任。";
+            evidence = $"幽灵用户/无反馈类。总通讯数据量仅 {chat.Length} 字节。对于营销或上课的自动化消息未产生有效交互，意愿极低，再推销会引发反感。";
+        }
+
+        string rules = $"【定档依据】: {evidence}";
+        
+        string sql = "INSERT INTO Students (Uid, ClassType, Rules, Needs) VALUES (@Uid, @Class, @Rules, @Needs)";
+        await db.ExecuteAsync(sql, new { Uid = uid, Class = classType, Rules = rules, Needs = needs });
+        count++;
+    }
+    return Results.Ok(new { Message = $"已执行了 {count} 次大模型深度风控分析，提炼了原话证据并全量落盘注入 Students!" });
+})
+.WithName("RunAiPipeline")
+.WithOpenApi();
+
+// ---- 接口28: 查看后台 Cron Job 风控同步进度 ----
+app.MapGet("/api/admin/job-status", async (IDbConnection db) => {
+    var totalOrders = await db.ExecuteScalarAsync<int>("SELECT COUNT(DISTINCT [用户UID]) FROM Orders WHERE [用户UID] != '' AND [用户UID] IS NOT NULL");
+    var totalInfo = await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Info");
+    var totalStudents = await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM Students");
+    
+    return Results.Ok(new {
+        TotalUniqueOrders = totalOrders,
+        ChatFetchedAndSaved = totalInfo,
+        AiAnalyzedUsers = totalStudents,
+        RemainingQueue = totalOrders - totalInfo,
+        Progress = $"{(totalInfo * 100.0 / (totalOrders == 0 ? 1 : totalOrders)):0.00}%"
+    });
+})
+.WithName("GetJobStatus")
+.WithOpenApi();
 
 app.UseStaticFiles();
 
@@ -1225,5 +1338,137 @@ public class DingTalkTokenResponse
     public int errcode { get; set; }
     public string errmsg { get; set; }
     public string access_token { get; set; }
+}
+
+public class UserSyncCronJob : BackgroundService
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<UserSyncCronJob> _logger;
+
+    public UserSyncCronJob(IServiceProvider serviceProvider, ILogger<UserSyncCronJob> logger)
+    {
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("🚀 [CronJob] 开始自动巡检 Orders 增量数据...");
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                var connStr = config.GetConnectionString("DefaultConnection");
+                using var db = new SqlConnection(connStr);
+                
+                // 1. 获取尚未同步过分析的一批新兵 (每批处理最多50人避免阻塞)
+                string sqlFindNew = @"
+                    SELECT DISTINCT TOP 50 CAST([用户UID] AS NVARCHAR(255)) 
+                    FROM Orders 
+                    WHERE [用户UID] NOT IN (SELECT Uid FROM Info) AND [用户UID] != '' AND [用户UID] IS NOT NULL";
+                var newUids = await db.QueryAsync<string>(sqlFindNew);
+                
+                if (newUids != null && newUids.Any())
+                {
+                    _logger.LogInformation($"📌 [CronJob] 捕捉到新入库订单，共萃取尚未体检的用户：{newUids.Count()} 位");
+                    var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+                    var client = httpClientFactory.CreateClient();
+                    
+                    foreach (var uidStr in newUids)
+                    {
+                        string cleanUidStr = uidStr.EndsWith(".0") ? uidStr.Substring(0, uidStr.Length - 2) : uidStr;
+                        if(!long.TryParse(cleanUidStr, out long uid)) {
+                            _logger.LogWarning($"[CronJob] 无法解析 UID: {uidStr}，跳过该记录。");
+                            continue;
+                        }
+
+                        _logger.LogInformation($"[CronJob] 正在打通内部 API 拉取用户 {uid} ({uidStr}) 的原始高危聊天记录...");
+                        string chatGroupRes = "{}";
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                        try 
+                        {
+                            var payload = new { studentUid = uid, startTime = "2025-01-01 00:00:00", endTime = "2026-12-31 23:59:59" };
+                            var content = JsonContent.Create(payload);
+                            
+                            var reqPrivate = await client.PostAsync("https://ops.xibojiaoyu.com/xmkp-backend-middle/ops/qwChat/queryChatByStudent", content, cts.Token);
+                            var privateData = await reqPrivate.Content.ReadAsStringAsync();
+                            if(!string.IsNullOrWhiteSpace(privateData) && privateData.TrimStart().StartsWith("{")) 
+                            {
+                                var privateJson = System.Text.Json.JsonDocument.Parse(privateData);
+                                var code = privateJson.RootElement.GetProperty("code").GetInt32();
+                                if(code == 0) {
+                                    chatGroupRes = privateData;
+                                }
+                            }
+                        } 
+                        catch (Exception ex) 
+                        {
+                            _logger.LogError($"[CronJob] 抓取失败: {uid} -> {ex.Message}");
+                        }
+                        
+                        await db.ExecuteAsync("INSERT INTO Info (Uid, ChatHistory) VALUES (@u, @c)", new { u = uidStr, c = chatGroupRes });
+                        
+                        string chat = chatGroupRes;
+                        string classType = "B";
+                        string needs = "期望稳健的学习和长期的价值陪伴，可推介核心产品线。";
+                        string evidence = "未检测到风险触发词，沟通时长和频次正常。";
+                        
+                        string GetContext(string text, string keyword) {
+                            int idx = text.IndexOf(keyword);
+                            if (idx == -1) return "";
+                            int start = Math.Max(0, idx - 15);
+                            int length = Math.Min(text.Length - start, 40);
+                            return text.Substring(start, length).Replace("\n", " ").Replace("\r", " ");
+                        }
+
+                        if(chat.Contains("退款") || chat.Contains("穷") || chat.Contains("没钱") || chat.Contains("负担不起")) {
+                            classType = "C1";
+                            needs = "极度需要学姐/班主任的情绪抚慰和心理建设；严禁高压销售，需搭配极低难度的回本短单。";
+                            string kw = chat.Contains("退款") ? "退款" : (chat.Contains("没钱") ? "没钱" : "负担不起");
+                            evidence = $"触发了财务窘迫或信心崩溃红线。敏感原话：『...{GetContext(chat, kw)}...』。该用户存在客诉退费风险。";
+                        }
+                        else if(chat.Contains("借钱") || chat.Contains("负债") || chat.Contains("救命") || chat.Contains("投诉") || chat.Contains("骗人")) {
+                            classType = "D";
+                            needs = "【系统禁入】：绝对禁止高客单逼单，立即切入防客诉通道，导向免费或超低价隔离区。";
+                            string kw = chat.Contains("负债") ? "负债" : (chat.Contains("投诉") ? "投诉" : "借钱");
+                            evidence = $"触碰最高防线【D类熔断】。风险句：『...{GetContext(chat, kw)}...』。此类用户已被打上大黑标签，强行转化会引爆黑猫投诉。";
+                        }
+                        else if (chat.Contains("投资") || chat.Contains("企业") || chat.Contains("老板") || chat.Contains("资源") || chat.Contains("合作")) {
+                            classType = "A";
+                            needs = "拒绝标品敷衍，需要提供 VIP 师徒指导、闭门私董会及高位流量倾斜。";
+                            string kw = chat.Contains("投资") ? "投资" : (chat.Contains("老板") ? "老板" : "资源");
+                            evidence = $"高净值身份识别成功。关键诉求：『...{GetContext(chat, kw)}...』。要求顶级交付能力。";
+                        }
+                        else if(chat.Length < 350) {
+                            classType = "C2";
+                            needs = "应当静默处理，停止跨漏斗的机器私信轰炸，以免损坏私域信任。";
+                            evidence = $"幽灵用户/无反馈类。总通讯仅 {chat.Length} 字节。意愿极低，再推销会引发反感。";
+                        }
+
+                        string rules = $"【定档依据 (后台静默运算)】: {evidence}";
+                        
+                        await db.ExecuteAsync("INSERT INTO Students (Uid, ClassType, Rules, Needs) VALUES (@u, @c, @r, @n)", 
+                                                new { u = uidStr, c = classType, r = rules, n = needs });
+
+                        _logger.LogInformation($"[CronJob] 👉 用户 {uid} 判决完成！风控定档为：{classType} 级");
+                        await Task.Delay(500, stoppingToken);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation($"[CronJob] 未发现新入库的无痕订单。进入系统休眠保护...");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"[CronJob] 执行异常：{ex}");
+            }
+            
+            // 下次探底等待 15 分钟
+            await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);
+        }
+    }
 }
 

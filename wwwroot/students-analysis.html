@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XIBO NEXUS - 用户风控分析大屏 (ABCD模型)</title>
+    <!-- Use Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            red: '#E53935',
+                            dark: '#0f172a',
+                            card: '#1e293b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .badge-a {
+            background-color: rgba(52, 211, 153, 0.2);
+            color: #34d399;
+            border: 1px solid #34d399;
+        }
+
+        .badge-b {
+            background-color: rgba(96, 165, 250, 0.2);
+            color: #60a5fa;
+            border: 1px solid #60a5fa;
+        }
+
+        .badge-c1 {
+            background-color: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid #fbbf24;
+        }
+
+        .badge-c2 {
+            background-color: rgba(249, 115, 22, 0.2);
+            color: #f97316;
+            border: 1px solid #f97316;
+        }
+
+        .badge-d {
+            background-color: rgba(220, 38, 38, 0.2);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+            }
+        }
+
+        .tag-needs {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <!-- Navbar injected using vanilla js from previous chats if typical, else hardcoded for standalone -->
+    <nav class="fixed top-0 w-full z-50 glass-card border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 transition-transform duration-300 hover:scale-105 cursor-pointer">
+                        <span class="text-white font-bold text-2xl tracking-tighter cursor-pointer">XIBO <span
+                                class="text-brand-red transition-colors duration-300">NEXUS</span></span>
+                    </div>
+                    <div class="hidden md:block ml-10">
+                        <div class="flex items-baseline space-x-8">
+                            <a href="dashboard.html"
+                                class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">工作台</a>
+                            <a href="students-analysis.html"
+                                class="text-white bg-gray-900/50 border-l-4 border-brand-red px-3 py-2 text-sm font-bold shadow-md shadow-red-900/20">智能风控系统</a>
+                            <a href="usergrouplist.html"
+                                class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">销售漏斗</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
+
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-white mb-2">ABCD 大模型用户风控洞察系统</h1>
+            <p class="text-gray-400">基于最新企微语料实时探测高危退单群、提炼基本盘需求。已接入最新订单明细数据库。</p>
+        </div>
+
+        <!-- 聚合指标 -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center">
+                <div class="text-3xl font-bold text-emerald-400">A类</div>
+                <div class="text-sm text-gray-400 mt-1">高净值共创</div>
+            </div>
+            <div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center">
+                <div class="text-3xl font-bold text-blue-400">B类</div>
+                <div class="text-sm text-gray-400 mt-1">健康基本盘</div>
+            </div>
+            <div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center">
+                <div class="text-3xl font-bold text-yellow-400">C1类</div>
+                <div class="text-sm text-gray-400 mt-1">重情绪陪伴需护盘</div>
+            </div>
+            <div class="glass-card rounded-xl p-4 flex flex-col items-center justify-center">
+                <div class="text-3xl font-bold text-orange-500">C2类</div>
+                <div class="text-sm text-gray-400 mt-1">沉默/低净值不碰</div>
+            </div>
+            <div
+                class="glass-card rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden group border-red-900">
+                <div class="absolute inset-0 bg-red-900/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="text-3xl font-bold text-red-500">D类</div>
+                <div class="text-sm text-red-300 mt-1">红线预警防客诉</div>
+            </div>
+        </div>
+
+        <!-- 数据列表 -->
+        <div class="glass-card rounded-xl overflow-hidden">
+            <div class="p-6 border-b border-gray-800 flex justify-between items-center">
+                <h2 class="text-xl font-semibold">分析标本数据库 (TOP 100 样本展示)</h2>
+                <button onclick="loadData()"
+                    class="px-4 py-2 bg-brand-red hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg hover:shadow-red-500/30">
+                    <svg xmlns="http://www.w3.org/2000/website-svg" class="inline w-4 h-4 mr-2 -mt-0.5" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    实时刷新检测
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-800 text-left text-sm" id="studentsTable">
+                    <thead class="bg-gray-800/50">
+                        <tr>
+                            <th scope="col" class="px-6 py-4 font-semibold text-gray-300 tracking-wider">风控评级</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-gray-300 tracking-wider">学员UID</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-gray-300 tracking-wider">实付金额 / 退款</th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-gray-300 tracking-wider w-1/4">底层真实诉求
+                            </th>
+                            <th scope="col" class="px-6 py-4 font-semibold text-gray-300 tracking-wider w-1/3">大模型判决依据库
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/50" id="tableBody">
+                        <!-- Loading State -->
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                <div
+                                    class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand-red mx-auto mb-4">
+                                </div>
+                                正在连接核心业务基座...拉取并运算用户风控数据...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function getBadgeClass(type) {
+            if (!type) return 'bg-gray-700 text-gray-300';
+            const upper = type.toUpperCase();
+            if (upper.includes('A')) return 'badge-a';
+            if (upper.includes('B')) return 'badge-b';
+            if (upper.includes('C1')) return 'badge-c1';
+            if (upper.includes('C2')) return 'badge-c2';
+            if (upper.includes('D')) return 'badge-d font-bold';
+            return 'bg-gray-700 text-gray-300';
+        }
+
+        async function loadData() {
+            const tbody = document.getElementById('tableBody');
+
+            try {
+                const response = await fetch('/api/admin/students');
+                if (!response.ok) throw new Error('网络异常！');
+
+
+                const data = await response.json();
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-400">目前暂无数据，请检查跑单日志。</td></tr>`;
+                    return;
+                }
+
+                data.forEach(item => {
+                    const classType = item.classType || '未定位';
+                    const amountHtml = item.isRefund === '是'
+                        ? `<span class="text-red-400 font-medium">¥${item.actualAmount || 0}</span> <br><span class="text-xs text-red-500 bg-red-900/30 px-1 py-0.5 rounded mt-1 inline-block">含退款风险</span>`
+                        : `<span class="text-emerald-400 font-medium">¥${item.actualAmount || 0}</span> <br><span class="text-xs text-emerald-500 bg-emerald-900/30 px-1 py-0.5 rounded mt-1 inline-block">正常完单</span>`;
+
+                    const row = `
+                        <tr class="hover:bg-gray-800/30 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold tracking-wide ${getBadgeClass(classType)}">
+                                    ${classType} 级
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-gray-200">UID: ${item.userUID || '-'}</div>
+                                <div class="text-xs text-gray-500 truncate max-w-[120px]">${item.userWechatNickname || '无昵称'}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                ${amountHtml}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-indigo-200 bg-blue-900/10 p-2 rounded-md border border-blue-800/30">
+                                    ${item.needs || '暂无提炼'}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-400 leading-relaxed">
+                                    ${item.rules || '暂无判决线索'}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', row);
+                });
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-400">接口连接失败：${error.message} 请确保由 "dotnet run" 运行后端业务层主程。</td></tr>`;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+
+</html>

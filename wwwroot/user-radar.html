@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户心理定位坐标系 · 喜播用户解码看板</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a12;
+            --bg-card: #111122;
+            --bg-panel: #16162a;
+            --border: rgba(255, 255, 255, 0.06);
+            --text-primary: #f0f0ff;
+            --text-muted: rgba(255, 255, 255, 0.45);
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+            --accent-pink: #ec4899;
+            --grid-color: rgba(255, 255, 255, 0.04);
+            --axis-color: rgba(255, 255, 255, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Noto Sans SC', 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── 顶部大标题区 ── */
+        .header {
+            padding: 28px 40px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, transparent 100%);
+        }
+
+        .header-left h1 {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .header-left p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .header-badge {
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #a78bfa;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* ── 主体布局 ── */
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            padding: 24px 32px;
+            height: calc(100vh - 85px);
+        }
+
+        /* ── 左侧坐标系区 ── */
+        .chart-area {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .axis-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .axis-selector label {
+            font-weight: 500;
+        }
+
+        .axis-selector select {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .axis-separator {
+            color: var(--border);
+            font-size: 18px;
+            margin: 0 4px;
+        }
+
+        /* ── 坐标轴标签 ── */
+        .plot-wrapper {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        .y-label {
+            position: absolute;
+            left: -8px;
+            top: 50%;
+            transform: translateX(-50%) rotate(-90deg);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        .x-label {
+            position: absolute;
+            bottom: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        canvas#plotCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+            border-radius: 8px;
+        }
+
+        /* ── 右侧面板 ── */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            max-height: 100%;
+            padding-right: 4px;
+        }
+
+        .side-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .side-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .side-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        /* ── 图例卡片 ── */
+        .legend-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .legend-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: var(--bg-panel);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .legend-item:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .legend-item.active {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        .legend-info {
+            flex: 1;
+        }
+
+        .legend-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .legend-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .legend-type {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+            letter-spacing: 0.3px;
+        }
+
+        /* ── 用户详情卡片 ── */
+        .detail-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            display: none;
+        }
+
+        .detail-card.visible {
+            display: block;
+        }
+
+        .detail-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+        }
+
+        .detail-user-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .detail-user-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .detail-scores {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .score-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .score-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            width: 80px;
+            flex-shrink: 0;
+            font-weight: 500;
+        }
+
+        .score-bar {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .score-val {
+            font-size: 11px;
+            font-weight: 700;
+            width: 28px;
+            text-align: right;
+        }
+
+        .detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 14px;
+        }
+
+        .detail-tag {
+            font-size: 10px;
+            padding: 3px 9px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .detail-diagnosis {
+            margin-top: 14px;
+            padding: 10px 12px;
+            background: var(--bg-panel);
+            border-radius: 8px;
+            border-left: 3px solid;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        /* ── 象限说明卡片 ── */
+        .quadrant-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .quadrant-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+        }
+
+        .quadrant-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .q-block {
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            line-height: 1.5;
+            border: 1px solid;
+        }
+
+        .q-block .q-label {
+            font-weight: 700;
+            margin-bottom: 3px;
+            font-size: 12px;
+        }
+
+        .q-block .q-desc {
+            color: var(--text-muted);
+        }
+
+        /* ── 维度说明 ── */
+        .dimension-doc {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .dimension-doc h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 14px;
+        }
+
+        .dim-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: var(--bg-panel);
+            margin-bottom: 8px;
+            border-left: 3px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .dim-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .dim-name {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .dim-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ── 响应式 ── */
+        @media (max-width: 1000px) {
+            .main {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .side-panel {
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="header">
+        <div class="header-left">
+            <h1>🧠 用户心理定位坐标系</h1>
+            <p>基于 user-needs-decoder / SKILL.md · 喜播有声演播攀登计划用户解码看板</p>
+        </div>
+        <span class="header-badge">v2.1 · ABCD 四维定位</span>
+    </header>
+
+    <div class="main">
+
+        <!-- ── 左侧主图区 ── -->
+        <div class="chart-area">
+            <div class="chart-controls">
+                <div class="axis-selector">
+                    <label>X轴：</label>
+                    <select id="xAxisSel" onchange="redraw()">
+                        <option value="execution">执行力指数</option>
+                        <option value="monetize">变现紧迫度</option>
+                        <option value="social">社群影响力</option>
+                        <option value="ltv">LTV潜力值</option>
+                        <option value="risk">心理脆弱度</option>
+                        <option value="invest">经济投入度</option>
+                    </select>
+                </div>
+                <span class="axis-separator">×</span>
+                <div class="axis-selector">
+                    <label>Y轴：</label>
+                    <select id="yAxisSel" onchange="redraw()">
+                        <option value="monetize">变现紧迫度</option>
+                        <option value="execution">执行力指数</option>
+                        <option value="social">社群影响力</option>
+                        <option value="ltv">LTV潜力值</option>
+                        <option value="risk">心理脆弱度</option>
+                        <option value="invest">经济投入度</option>
+                    </select>
+                </div>
+                <span class="axis-separator">●</span>
+                <div class="axis-selector">
+                    <label>气泡大小：</label>
+                    <select id="sizeAxisSel" onchange="redraw()">
+                        <option value="ltv">LTV潜力值</option>
+                        <option value="social">社群影响力</option>
+                        <option value="invest">经济投入度</option>
+                        <option value="risk">心理脆弱度</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="plot-wrapper">
+                <div class="y-label" id="yLabel">变现紧迫度 →</div>
+                <canvas id="plotCanvas"></canvas>
+                <div class="x-label" id="xLabel">← 执行力指数 →</div>
+            </div>
+        </div>
+
+        <!-- ── 右侧面板 ── -->
+        <div class="side-panel">
+
+            <!-- 用户图例 -->
+            <div class="legend-card">
+                <h3>📋 已解码用户列表</h3>
+                <div class="legend-items" id="legendItems"></div>
+            </div>
+
+            <!-- 选中用户详情 -->
+            <div class="detail-card" id="detailCard">
+                <h3>🔍 用户解码详情</h3>
+                <div id="detailContent"></div>
+            </div>
+
+            <!-- 象限说明 -->
+            <div class="quadrant-card">
+                <h3>🗺️ 象限策略速查</h3>
+                <div class="quadrant-grid">
+                    <div class="q-block" style="background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.25)">
+                        <div class="q-label" style="color:#10b981">🚀 右上象限</div>
+                        <div class="q-desc">高执行×高紧迫<br><b>B类精英型</b><br>优先资源倾斜，帮助首单突破</div>
+                    </div>
+                    <div class="q-block" style="background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.25)">
+                        <div class="q-label" style="color:#60a5fa">💎 左上象限</div>
+                        <div class="q-desc">低执行×高紧迫<br><b>C2风险型</b><br>风控优先，防止退费爆雷</div>
+                    </div>
+                    <div class="q-block" style="background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.25)">
+                        <div class="q-label" style="color:#f59e0b">⭐ 右下象限</div>
+                        <div class="q-desc">高执行×低紧迫<br><b>A/B成长型</b><br>长期陪伴，转介绍挖掘</div>
+                    </div>
+                    <div class="q-block" style="background:rgba(236,72,153,0.08);border-color:rgba(236,72,153,0.25)">
+                        <div class="q-label" style="color:#ec4899">🌸 左下象限</div>
+                        <div class="q-desc">低执行×低紧迫<br><b>C1情绪型</b><br>低压陪伴，情感驱动留存</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 维度说明 -->
+            <div class="dimension-doc">
+                <h3>📐 评分维度说明</h3>
+                <div class="dim-item" style="border-left-color:#10b981">
+                    <div class="dim-name" style="color:#10b981">⚡ 执行力指数</div>
+                    <div class="dim-desc">作业完成率 + 打卡频率 + 主动行为 + 凌晨录音 + 帮助他人意愿</div>
+                </div>
+                <div class="dim-item" style="border-left-color:#f59e0b">
+                    <div class="dim-name" style="color:#f59e0b">💰 变现紧迫度</div>
+                    <div class="dim-desc">经济压力 + 负债情况 + 开源迫切程度 + 期望收入与现状落差</div>
+                </div>
+                <div class="dim-item" style="border-left-color:#3b82f6">
+                    <div class="dim-name" style="color:#60a5fa">🌐 社群影响力</div>
+                    <div class="dim-desc">群内发言量 + 帮助他人 + 被@频率 + KOL特质 + 转介绍潜力</div>
+                </div>
+                <div class="dim-item" style="border-left-color:#8b5cf6">
+                    <div class="dim-name" style="color:#a78bfa">📈 LTV潜力值</div>
+                    <div class="dim-desc">续费概率 + 客单价承受力 + 转介绍潜力 + 内容共创价值综合评分</div>
+                </div>
+                <div class="dim-item" style="border-left-color:#ef4444">
+                    <div class="dim-name" style="color:#ef4444">🛡️ 心理脆弱度</div>
+                    <div class="dim-desc">自我怀疑信号 + 沉没成本焦虑 + 退费暗示 + 外部施压（家庭反对）</div>
+                </div>
+                <div class="dim-item" style="border-left-color:#ec4899">
+                    <div class="dim-name" style="color:#ec4899">💎 经济投入度</div>
+                    <div class="dim-desc">总付费金额 ÷ 估算月收入 = 投入比（越高说明沉没成本越重）</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ══════════════════════════════════════════
+        //  用户数据库（从SKILL报告提取的评分）
+        // ══════════════════════════════════════════
+        const USERS = [
+            {
+                uid: '542248992',
+                name: '小月亮',
+                meta: '早期分析用户 · 班级群',
+                type: 'C1',
+                typeLabel: 'C1 情绪型',
+                color: '#ec4899',
+                scores: {
+                    execution: 35,   // 作业提交稳定，但没有主动突破
+                    monetize: 40,   // 有开源意愿但压力不大
+                    social: 30,   // 群内中等活跃
+                    ltv: 45,   // 续费概率中等
+                    risk: 55,   // 有一定自我怀疑
+                    invest: 55,   // 付费相对收入占比适中
+                },
+                diagnosis: 'C1情绪消费型，在课程中寻求归属感与陪伴，变现期望温和',
+                tags: ['C1情绪型', '情感陪伴', '中等执行力', '普通话需提升']
+            },
+            {
+                uid: '677047858',
+                name: '晨曦拾光',
+                meta: '学员 · 班级群',
+                type: 'B',
+                typeLabel: 'B 成长型',
+                color: '#3b82f6',
+                scores: {
+                    execution: 60,
+                    monetize: 65,
+                    social: 45,
+                    ltv: 65,
+                    risk: 40,
+                    invest: 60,
+                },
+                diagnosis: 'B类成长型，有明确兼职变现目标，执行稳健，适合标准路径推进',
+                tags: ['B类成长型', '兼职目标', '稳健型', '社群参与']
+            },
+            {
+                uid: '676779115',
+                name: '声动未来',
+                meta: '学员 · 班级群',
+                type: 'B',
+                typeLabel: 'B 成长型',
+                color: '#60a5fa',
+                scores: {
+                    execution: 68,
+                    monetize: 58,
+                    social: 52,
+                    ltv: 70,
+                    risk: 35,
+                    invest: 65,
+                },
+                diagnosis: 'B类成长型，理性规划，执行力较强，LTV潜力较高',
+                tags: ['B类成长型', '理性规划', '高LTV潜力', '技能积累中']
+            },
+            {
+                uid: '676607625',
+                name: '趣音小阅',
+                meta: '武汉 · 医护单亲妈妈 · 义务班长',
+                type: 'B+',
+                typeLabel: 'B+ 高潜搏杀型',
+                color: '#10b981',
+                scores: {
+                    execution: 97,   // 凌晨录音+嘴巴溃疡照练+帮同学+写5版剧本
+                    monetize: 91,   // 单亲+花呗未清+月入2000+，开源是生存需求
+                    social: 92,   // 事实班长，群消息占30%+，KOL级别
+                    ltv: 88,   // 高续费潜力但需快速首单
+                    risk: 62,   // 极致投入有倦怠风险，被骗过有防备心
+                    invest: 95,   // 总投入超1万÷月收入2000+ = 沉重投入比
+                },
+                diagnosis: '极罕见的B+型：月收2000单亲妈妈，靠碾压执行力（凌晨录音/溃疡照练/写剧本5版）成为义务班长。核心风险：试音持续受挫→断崖退出',
+                tags: ['B+高潜型', '单亲搏杀', '义务班长', '试音卡点', '首单关键']
+            },
+            {
+                uid: '676963823',
+                name: '语舒静婉',
+                meta: '广西南宁 · 宝妈 · 瞒着老公买设备',
+                type: 'C1/B',
+                typeLabel: 'C1/B 边界·温吞型',
+                color: '#a78bfa',
+                scores: {
+                    execution: 42,   // 慢但没消失，碎片时间跟进
+                    monetize: 45,   // 有变现期望但压力不如趣音小阅
+                    social: 28,   // 以"收到"为主，影响力低
+                    ltv: 52,   // 中等，需要首单激活
+                    risk: 58,   // 普通话速读卡点引发自我怀疑+老公知情风险
+                    invest: 82,   // 总投入1.2万÷收入比（无主职），隐性沉没成本重
+                },
+                diagnosis: 'C1/B边界型宝妈：有声是她"瞒着老公"的自我空间出口，变现期望温和，慢热但坚持，核心风险是无感流失而非爆发退出',
+                tags: ['C1/B边界', '温吞宝妈', '隐性自主', '普通话卡点', '低压陪伴策略']
+            },
+        ];
+
+        // ── 维度 meta
+        const DIM_META = {
+            execution: { label: '执行力指数', color: '#10b981' },
+            monetize: { label: '变现紧迫度', color: '#f59e0b' },
+            social: { label: '社群影响力', color: '#60a5fa' },
+            ltv: { label: 'LTV潜力值', color: '#a78bfa' },
+            risk: { label: '心理脆弱度', color: '#ef4444' },
+            invest: { label: '经济投入度', color: '#ec4899' },
+        };
+
+        // ── ABCD标签颜色
+        const TYPE_COLORS = {
+            'A': { bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.4)', text: '#fbbf24' },
+            'B+': { bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.4)', text: '#10b981' },
+            'B': { bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.4)', text: '#60a5fa' },
+            'C1/B': { bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.4)', text: '#a78bfa' },
+            'C1': { bg: 'rgba(236,72,153,0.15)', border: 'rgba(236,72,153,0.4)', text: '#f9a8d4' },
+            'C2': { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)', text: '#fca5a5' },
+            'D': { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.15)', text: '#9ca3af' },
+        };
+        function typeStyle(type) {
+            return TYPE_COLORS[type] || TYPE_COLORS['D'];
+        }
+
+        // ══════════════════════════════════════════
+        //  渲染图例列表
+        // ══════════════════════════════════════════
+        let selectedUid = null;
+
+        function buildLegend() {
+            const el = document.getElementById('legendItems');
+            el.innerHTML = '';
+            USERS.forEach(u => {
+                const ts = typeStyle(u.type);
+                const div = document.createElement('div');
+                div.className = 'legend-item';
+                div.id = 'legend-' + u.uid;
+                div.innerHTML = `
+      <div class="legend-dot" style="background:${u.color};color:${u.color}"></div>
+      <div class="legend-info">
+        <div class="legend-name">${u.name}</div>
+        <div class="legend-sub">${u.meta}</div>
+      </div>
+      <span class="legend-type" style="background:${ts.bg};border:1px solid ${ts.border};color:${ts.text}">${u.typeLabel}</span>
+    `;
+                div.onclick = () => selectUser(u.uid);
+                el.appendChild(div);
+            });
+        }
+
+        function selectUser(uid) {
+            selectedUid = selectedUid === uid ? null : uid;
+            document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+            if (selectedUid) {
+                document.getElementById('legend-' + selectedUid)?.classList.add('active');
+                showDetail(selectedUid);
+            } else {
+                document.getElementById('detailCard').classList.remove('visible');
+            }
+            redraw();
+        }
+
+        // ══════════════════════════════════════════
+        //  用户详情卡
+        // ══════════════════════════════════════════
+        function showDetail(uid) {
+            const u = USERS.find(x => x.uid === uid);
+            if (!u) return;
+            const card = document.getElementById('detailCard');
+            const ts = typeStyle(u.type);
+            const dims = Object.entries(u.scores);
+
+            const bars = dims.map(([k, v]) => `
+    <div class="score-row">
+      <span class="score-label">${DIM_META[k].label}</span>
+      <div class="score-bar">
+        <div class="score-fill" style="width:${v}%;background:${DIM_META[k].color}"></div>
+      </div>
+      <span class="score-val" style="color:${DIM_META[k].color}">${v}</span>
+    </div>
+  `).join('');
+
+            const tagsHtml = u.tags.map(t =>
+                `<span class="detail-tag" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:${u.color}">${t}</span>`
+            ).join('');
+
+            document.getElementById('detailContent').innerHTML = `
+    <div class="detail-user-name" style="color:${u.color}">${u.name}</div>
+    <div class="detail-user-meta">UID: ${u.uid} · ${u.meta}</div>
+    <div class="detail-scores">${bars}</div>
+    <div class="detail-tags">${tagsHtml}</div>
+    <div class="detail-diagnosis" style="border-left-color:${u.color}">
+      <strong style="color:${u.color}">核心诊断：</strong>${u.diagnosis}
+    </div>
+  `;
+            card.classList.add('visible');
+        }
+
+        // ══════════════════════════════════════════
+        //  Canvas 绘图引擎
+        // ══════════════════════════════════════════
+        const canvas = document.getElementById('plotCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function getAxes() {
+            return {
+                x: document.getElementById('xAxisSel').value,
+                y: document.getElementById('yAxisSel').value,
+                size: document.getElementById('sizeAxisSel').value,
+            };
+        }
+
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = wrapper.clientWidth * dpr;
+            canvas.height = wrapper.clientHeight * dpr;
+            canvas.style.width = wrapper.clientWidth + 'px';
+            canvas.style.height = wrapper.clientHeight + 'px';
+            ctx.scale(dpr, dpr);
+        }
+
+        function plotDims() {
+            // 边距留空
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+            const pad = { top: 32, right: 32, bottom: 42, left: 52 };
+            const inner = { x: pad.left, y: pad.top, w: w - pad.left - pad.right, h: h - pad.top - pad.bottom };
+            return { w, h, pad, inner };
+        }
+
+        function scoreToXY(xScore, yScore, inner) {
+            const px = inner.x + (xScore / 100) * inner.w;
+            const py = inner.y + inner.h - (yScore / 100) * inner.h;
+            return { px, py };
+        }
+
+        function drawGrid(inner) {
+            ctx.save();
+            // 象限背景
+            const cx = inner.x + inner.w / 2;
+            const cy = inner.y + inner.h / 2;
+
+            // 右上（绿）
+            ctx.fillStyle = 'rgba(16,185,129,0.04)';
+            ctx.fillRect(cx, inner.y, inner.w / 2, inner.h / 2);
+            // 左上（蓝）
+            ctx.fillStyle = 'rgba(59,130,246,0.04)';
+            ctx.fillRect(inner.x, inner.y, inner.w / 2, inner.h / 2);
+            // 右下（黄）
+            ctx.fillStyle = 'rgba(245,158,11,0.04)';
+            ctx.fillRect(cx, cy, inner.w / 2, inner.h / 2);
+            // 左下（粉）
+            ctx.fillStyle = 'rgba(236,72,153,0.03)';
+            ctx.fillRect(inner.x, cy, inner.w / 2, inner.h / 2);
+
+            // 网格线
+            ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i <= 9; i++) {
+                const gx = inner.x + (i / 10) * inner.w;
+                const gy = inner.y + (i / 10) * inner.h;
+                ctx.beginPath(); ctx.moveTo(gx, inner.y); ctx.lineTo(gx, inner.y + inner.h); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(inner.x, gy); ctx.lineTo(inner.x + inner.w, gy); ctx.stroke();
+            }
+
+            // 中心轴（更亮）
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(cx, inner.y); ctx.lineTo(cx, inner.y + inner.h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(inner.x, cy); ctx.lineTo(inner.x + inner.w, cy); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 坐标轴边框
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(inner.x, inner.y, inner.w, inner.h);
+
+            // 刻度与数字
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+            ctx.font = '10px Inter';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            [0, 25, 50, 75, 100].forEach(v => {
+                const gy = inner.y + inner.h - (v / 100) * inner.h;
+                ctx.fillText(v, inner.x - 8, gy);
+            });
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            [0, 25, 50, 75, 100].forEach(v => {
+                const gx = inner.x + (v / 100) * inner.w;
+                ctx.fillText(v, gx, inner.y + inner.h + 8);
+            });
+
+            ctx.restore();
+        }
+
+        function drawQuadrantLabels(inner) {
+            ctx.save();
+            const labels = [
+                { x: 0.75, y: 0.12, text: '🚀 高执行×高紧迫', color: 'rgba(16,185,129,0.6)', align: 'center' },
+                { x: 0.25, y: 0.12, text: '⚠️ 低执行×高紧迫', color: 'rgba(59,130,246,0.6)', align: 'center' },
+                { x: 0.75, y: 0.88, text: '⭐ 高执行×低紧迫', color: 'rgba(245,158,11,0.6)', align: 'center' },
+                { x: 0.25, y: 0.88, text: '🌸 低执行×低紧迫', color: 'rgba(236,72,153,0.6)', align: 'center' },
+            ];
+            ctx.font = '11px Noto Sans SC, Inter';
+            ctx.textBaseline = 'middle';
+            labels.forEach(l => {
+                ctx.fillStyle = l.color;
+                ctx.textAlign = l.align;
+                ctx.fillText(l.text, inner.x + l.x * inner.w, inner.y + l.y * inner.h);
+            });
+            ctx.restore();
+        }
+
+        function redraw() {
+            resizeCanvas();
+            const axes = getAxes();
+            const { inner } = plotDims();
+
+            ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+            drawGrid(inner);
+            drawQuadrantLabels(inner);
+            updateAxisLabels();
+
+            USERS.forEach(u => {
+                const xScore = u.scores[axes.x];
+                const yScore = u.scores[axes.y];
+                const sScore = u.scores[axes.size];
+                const { px, py } = scoreToXY(xScore, yScore, inner);
+
+                const isSelected = u.uid === selectedUid;
+                const isGhosted = selectedUid && !isSelected;
+
+                const baseRadius = 16 + (sScore / 100) * 22;
+                const r = baseRadius;
+                const alpha = isGhosted ? 0.25 : 1;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+
+                // 光晕
+                if (!isGhosted) {
+                    const glow = ctx.createRadialGradient(px, py, 0, px, py, r * 2.5);
+                    glow.addColorStop(0, u.color + '33');
+                    glow.addColorStop(1, u.color + '00');
+                    ctx.beginPath();
+                    ctx.arc(px, py, r * 2.5, 0, Math.PI * 2);
+                    ctx.fillStyle = glow;
+                    ctx.fill();
+                }
+
+                // 气泡本体
+                const grad = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, 0, px, py, r);
+                grad.addColorStop(0, u.color + 'cc');
+                grad.addColorStop(1, u.color + '44');
+                ctx.beginPath();
+                ctx.arc(px, py, r, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // 边框
+                ctx.strokeStyle = isSelected ? '#fff' : u.color;
+                ctx.lineWidth = isSelected ? 2.5 : 1.5;
+                ctx.stroke();
+
+                // 选中脉冲环
+                if (isSelected) {
+                    ctx.strokeStyle = u.color + '66';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(px, py, r + 8, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // 用户名
+                ctx.fillStyle = '#fff';
+                ctx.font = `${isSelected ? 700 : 600} 11px Noto Sans SC, Inter`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(u.name, px, py);
+
+                // 坐标数值标注（选中时）
+                if (isSelected) {
+                    const label = `(${xScore}, ${yScore})`;
+                    ctx.font = '500 10px Inter';
+                    ctx.fillStyle = u.color;
+                    ctx.fillText(label, px, py + r + 14);
+                }
+
+                ctx.restore();
+            });
+        }
+
+        function updateAxisLabels() {
+            const axes = getAxes();
+            document.getElementById('xLabel').textContent = `← ${DIM_META[axes.x].label} →`;
+            document.getElementById('yLabel').textContent = `${DIM_META[axes.y].label} →`;
+        }
+
+        // ── 点击高亮
+        canvas.addEventListener('click', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const axes = getAxes();
+            const { inner } = plotDims();
+
+            let hit = null;
+            let hitDist = Infinity;
+            USERS.forEach(u => {
+                const { px, py } = scoreToXY(u.scores[axes.x], u.scores[axes.y], inner);
+                const dist = Math.hypot(mx - px, my - py);
+                if (dist < 40 && dist < hitDist) { hit = u.uid; hitDist = dist; }
+            });
+            selectUser(hit);
+        });
+
+        // ── Hover 指针
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const axes = getAxes();
+            const { inner } = plotDims();
+
+            let hover = false;
+            USERS.forEach(u => {
+                const { px, py } = scoreToXY(u.scores[axes.x], u.scores[axes.y], inner);
+                if (Math.hypot(mx - px, my - py) < 40) hover = true;
+            });
+            canvas.style.cursor = hover ? 'pointer' : 'crosshair';
+        });
+
+        // ══════════════════════════════════════════
+        //  初始化 & 添加新用户 API
+        // ══════════════════════════════════════════
+        function addUser(userObj) {
+            USERS.push(userObj);
+            buildLegend();
+            redraw();
+        }
+
+        window.addEventListener('resize', redraw);
+        buildLegend();
+        redraw();
+
+        // 窗口焦点后重绘（防止字体加载延迟）
+        setTimeout(redraw, 600);
+    </script>
+</body>
+
+</html>
