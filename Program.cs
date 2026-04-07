@@ -28,6 +28,22 @@ builder.Services.AddTransient<IDbConnection>((sp) => new SqlConnection(connectio
 
 var app = builder.Build();
 
+// 自动初始化数据库表 (UserSessions & AnalyzedDocs)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<IDbConnection>();
+    db.Execute(@"
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserSessions')
+        CREATE TABLE UserSessions (Token NVARCHAR(255) PRIMARY KEY, Username NVARCHAR(255) NOT NULL, CreatedAt DATETIME DEFAULT GETDATE());
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AnalyzedDocs')
+        CREATE TABLE AnalyzedDocs (DocId NVARCHAR(255) PRIMARY KEY, CreatedAt DATETIME DEFAULT GETDATE());
+        
+        -- 预设排除的历史文档
+        IF NOT EXISTS (SELECT * FROM AnalyzedDocs WHERE DocId='Exel2BLV5zv9wMEDFDDmMy1nJgk9rpMq')
+        INSERT INTO AnalyzedDocs (DocId) VALUES ('Exel2BLV5zv9wMEDFDDmMy1nJgk9rpMq');
+    ");
+}
+
 // 强制开启 Swagger (即使当前环境显示为 Production 也能访问测试界面)
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -113,12 +129,7 @@ app.MapDelete("/api/finance/delete/{id}", async (int id, IDbConnection db) =>
 // 🔐 实际业务功能：用户认证模块 (Auth)
 // ==========================================
 
-// 鉴权辅助：内存 Token 字典（生产环境应使用 JWT 或 Redis Session）
-var AdminTokens = new Dictionary<string, string>();
-
-// 战略洞察分析防骚扰(去重)数据库：记录已经被分析过的文档 ID
-// 预先将刚才单独提炼过的私域 PDF 的节点 ID 存进去作为排除历史
-var AnalyzedDocIds = new HashSet<string> { "Exel2BLV5zv9wMEDFDDmMy1nJgk9rpMq" };
+// 鉴权辅助和分析去重现在已持久化到 SQL Server 的 UserSessions 和 AnalyzedDocs 表中。
 
 
 // ---- 提供一个极简密码哈希的本地方法 (模拟生产环境的安全性) ----
@@ -171,8 +182,9 @@ app.MapPost("/api/auth/login", async ([FromBody] UserLoginRequest request, IDbCo
     {
         // 生成一个极简 Token（用户名+时间戳的哈希），用于后续接口鉴权
         string token = HashPassword(user.Username + DateTime.Now.Ticks.ToString());
-        // 将 Token 临时存入内存字典（生产环境应使用 Redis）
-        AdminTokens[token] = user.Username;
+        
+        // 将 Token 持久化存入数据库
+        await db.ExecuteAsync("INSERT INTO UserSessions (Token, Username) VALUES (@Token, @Username)", new { Token = token, Username = user.Username });
 
         return Results.Ok(new { 
             Message = "登录成功", 
@@ -192,13 +204,14 @@ app.MapPost("/api/auth/login", async ([FromBody] UserLoginRequest request, IDbCo
 
 
 
-// 校验 Token 的本地方法
-static bool IsAdmin(HttpContext ctx, Dictionary<string, string> tokens)
+// 校验 Token 的持久化方法
+static async Task<bool> IsAdminCheck(HttpContext ctx, IDbConnection db)
 {
     string? authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
     if (string.IsNullOrEmpty(authHeader)) return false;
     string token = authHeader.Replace("Bearer ", "");
-    return tokens.ContainsKey(token);
+    int count = await db.QueryFirstOrDefaultAsync<int>("SELECT COUNT(1) FROM UserSessions WHERE Token = @Token", new { Token = token });
+    return count > 0;
 }
 
 // ---- 接口6: 公开 - 获取新闻列表 (不需要登录) ----
@@ -223,7 +236,7 @@ app.MapGet("/api/news/{id}", async (int id, IDbConnection db) =>
 // ---- 接口8: 管理员 - 新增新闻 ----
 app.MapPost("/api/admin/news", async (HttpContext ctx, [FromBody] NewsCreateRequest request, IDbConnection db) =>
 {
-    if (!IsAdmin(ctx, AdminTokens)) return Results.Unauthorized();
+    if (!await IsAdminCheck(ctx, db)) return Results.Unauthorized();
 
     string sql = @"
         INSERT INTO News (Title, Summary, Content, Author, CoverUrl) 
@@ -238,7 +251,7 @@ app.MapPost("/api/admin/news", async (HttpContext ctx, [FromBody] NewsCreateRequ
 // ---- 接口9: 管理员 - 修改新闻 ----
 app.MapPut("/api/admin/news/{id}", async (HttpContext ctx, int id, [FromBody] NewsCreateRequest request, IDbConnection db) =>
 {
-    if (!IsAdmin(ctx, AdminTokens)) return Results.Unauthorized();
+    if (!await IsAdminCheck(ctx, db)) return Results.Unauthorized();
 
     string sql = @"
         UPDATE News SET Title=@Title, Summary=@Summary, Content=@Content, Author=@Author, CoverUrl=@CoverUrl, UpdatedAt=GETDATE()
@@ -253,7 +266,7 @@ app.MapPut("/api/admin/news/{id}", async (HttpContext ctx, int id, [FromBody] Ne
 // ---- 接口10: 管理员 - 删除新闻 ----
 app.MapDelete("/api/admin/news/{id}", async (HttpContext ctx, int id, IDbConnection db) =>
 {
-    if (!IsAdmin(ctx, AdminTokens)) return Results.Unauthorized();
+    if (!await IsAdminCheck(ctx, db)) return Results.Unauthorized();
 
     int rows = await db.ExecuteAsync("DELETE FROM News WHERE Id = @Id", new { Id = id });
     if (rows == 0) return Results.NotFound(new { Message = "文章不存在" });
@@ -268,15 +281,15 @@ app.MapDelete("/api/admin/news/{id}", async (HttpContext ctx, int id, IDbConnect
 // ==========================================
 
 // ---- DSTE 动态权限系统 (连接数据库实时查询) ----
-static async Task<int> GetUserLevelAsync(HttpContext ctx, Dictionary<string, string> tokens, IDbConnection db)
+static async Task<int> GetUserLevelAsync(HttpContext ctx, IDbConnection db)
 {
     string? authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
     if (string.IsNullOrEmpty(authHeader)) return 4; // 未携带Token默认当做底层普通员工(L4)处理
     string token = authHeader.Replace("Bearer ", "");
     
-    if (!tokens.ContainsKey(token)) return 4; // Token不存在也按L4处理
+    string username = await db.QueryFirstOrDefaultAsync<string>("SELECT Username FROM UserSessions WHERE Token = @Token", new { Token = token });
+    if (string.IsNullOrEmpty(username)) return 4;
 
-    string username = tokens[token];
     // 实时读取数据库人员架构树里的级别设定，一旦后台调级，前端接口立马生效并控制数据降维或脱敏
     string sql = "SELECT RoleLevel FROM Users WHERE Username = @Username";
     int level = await db.QueryFirstOrDefaultAsync<int>(sql, new { Username = username });
@@ -292,7 +305,7 @@ static async Task<int> GetUserLevelAsync(HttpContext ctx, Dictionary<string, str
 // 能够获取公司未来的战略愿景，但是金额只有 L1(老板/CFO)可见。
 app.MapGet("/api/dste/strategy", async (HttpContext ctx, IDbConnection db) =>
 {
-    int userLevel = await GetUserLevelAsync(ctx, AdminTokens, db);
+    int userLevel = await GetUserLevelAsync(ctx, db);
     
     var spList = await db.QueryAsync<StrategicPlan>("SELECT * FROM StrategicPlan ORDER BY PlanYear DESC");
     
@@ -320,7 +333,7 @@ app.MapGet("/api/dste/strategy", async (HttpContext ctx, IDbConnection db) =>
 // 返回战略执行层面的部门级四象限指标。下级能够看到进度条，但看不到真实的大数据。
 app.MapGet("/api/dste/bsc/{spId}", async (HttpContext ctx, int spId, IDbConnection db) =>
 {
-    int userLevel = await GetUserLevelAsync(ctx, AdminTokens, db);
+    int userLevel = await GetUserLevelAsync(ctx, db);
     
     // 查询该战略下的所有BSC指标
     var bscList = await db.QueryAsync<BalancedScorecard>(
@@ -503,8 +516,8 @@ app.MapGet("/api/dste/kpi", async (HttpContext ctx, IDbConnection db) =>
 {
     string? authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
     string token = authHeader?.Replace("Bearer ", "") ?? "";
-    string currentUser = AdminTokens.ContainsKey(token) ? AdminTokens[token] : "";
-    int userLevel = await GetUserLevelAsync(ctx, AdminTokens, db);
+    string currentUser = await db.QueryFirstOrDefaultAsync<string>("SELECT Username FROM UserSessions WHERE Token = @Token", new { Token = token }) ?? "";
+    int userLevel = await GetUserLevelAsync(ctx, db);
 
     // 基于权限动态构建SQL
     // 注意：实际项目中通常是通过WHERE加参数过滤，此处为简化逻辑
@@ -552,7 +565,7 @@ app.MapGet("/api/dste/kpi", async (HttpContext ctx, IDbConnection db) =>
 // 仅 L1 管理员可访问
 app.MapGet("/api/dste/users", async (HttpContext ctx, IDbConnection db) => 
 {
-    int userLevel = await GetUserLevelAsync(ctx, AdminTokens, db);
+    int userLevel = await GetUserLevelAsync(ctx, db);
     if(userLevel > 1) return Results.Unauthorized(); 
 
     var users = await db.QueryAsync<User>("SELECT Id, Username, RoleLevel, CreatedAt FROM Users");
@@ -564,7 +577,7 @@ app.MapGet("/api/dste/users", async (HttpContext ctx, IDbConnection db) =>
 // ---- 接口17: 用户管理 - 修改用户权限级别 ----
 app.MapPut("/api/dste/users/{id}/role", async (HttpContext ctx, int id, [FromBody] int targetRole, IDbConnection db) => 
 {
-    int userLevel = await GetUserLevelAsync(ctx, AdminTokens, db);
+    int userLevel = await GetUserLevelAsync(ctx, db);
     if(userLevel > 1) return Results.Unauthorized(); 
 
     string sql = "UPDATE Users SET RoleLevel = @RoleLevel WHERE Id = @Id";
@@ -578,44 +591,44 @@ app.MapPut("/api/dste/users/{id}/role", async (HttpContext ctx, int id, [FromBod
 
 // ---- 接口18: 后台管理 - SP 战略增删改查 ----
 app.MapGet("/api/admin/dste/sp", async (HttpContext ctx, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     return Results.Ok(await db.QueryAsync<StrategicPlan>("SELECT * FROM StrategicPlan ORDER BY PlanYear DESC"));
 });
 app.MapPost("/api/admin/dste/sp", async (HttpContext ctx, [FromBody] StrategicPlan sp, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     string sql = @"INSERT INTO StrategicPlan (PlanYear, Vision, CoreValues, PublicDirection, ConfidentialFinancialGoal) VALUES (@PlanYear, @Vision, @CoreValues, @PublicDirection, @ConfidentialFinancialGoal); SELECT CAST(SCOPE_IDENTITY() as int)";
     return Results.Ok(new { Message = "新增成功", Id = await db.QuerySingleAsync<int>(sql, sp) });
 });
 app.MapPut("/api/admin/dste/sp/{id}", async (HttpContext ctx, int id, [FromBody] StrategicPlan sp, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     sp.Id = id;
     int rows = await db.ExecuteAsync("UPDATE StrategicPlan SET PlanYear=@PlanYear, Vision=@Vision, CoreValues=@CoreValues, PublicDirection=@PublicDirection, ConfidentialFinancialGoal=@ConfidentialFinancialGoal WHERE Id=@Id", sp);
     return rows > 0 ? Results.Ok(new { Message = "更新成功" }) : Results.NotFound();
 });
 app.MapDelete("/api/admin/dste/sp/{id}", async (HttpContext ctx, int id, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     int rows = await db.ExecuteAsync("DELETE FROM StrategicPlan WHERE Id=@Id", new { Id = id });
     return rows > 0 ? Results.Ok(new { Message = "删除成功" }) : Results.NotFound();
 });
 
 // ---- 接口19: 后台管理 - BSC 计分卡增删改查 ----
 app.MapGet("/api/admin/dste/bsc", async (HttpContext ctx, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     return Results.Ok(await db.QueryAsync<BalancedScorecard>("SELECT * FROM BalancedScorecard ORDER BY CreatedAt DESC"));
 });
 app.MapPost("/api/admin/dste/bsc", async (HttpContext ctx, [FromBody] BalancedScorecard bsc, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     string sql = @"INSERT INTO BalancedScorecard (StrategicPlanId, DepartmentName, Perspective, Objective, TargetValue, CurrentValue, ConfidentialityLevel) VALUES (@StrategicPlanId, @DepartmentName, @Perspective, @Objective, @TargetValue, @CurrentValue, @ConfidentialityLevel); SELECT CAST(SCOPE_IDENTITY() as int)";
     return Results.Ok(new { Message = "新增成功", Id = await db.QuerySingleAsync<int>(sql, bsc) });
 });
 app.MapPut("/api/admin/dste/bsc/{id}", async (HttpContext ctx, int id, [FromBody] BalancedScorecard bsc, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     bsc.Id = id;
     int rows = await db.ExecuteAsync("UPDATE BalancedScorecard SET StrategicPlanId=@StrategicPlanId, DepartmentName=@DepartmentName, Perspective=@Perspective, Objective=@Objective, TargetValue=@TargetValue, CurrentValue=@CurrentValue, ConfidentialityLevel=@ConfidentialityLevel WHERE Id=@Id", bsc);
     return rows > 0 ? Results.Ok(new { Message = "更新成功" }) : Results.NotFound();
 });
 app.MapDelete("/api/admin/dste/bsc/{id}", async (HttpContext ctx, int id, IDbConnection db) => {
-    if(await GetUserLevelAsync(ctx, AdminTokens, db) > 1) return Results.Unauthorized(); 
+    if(await GetUserLevelAsync(ctx, db) > 1) return Results.Unauthorized(); 
     int rows = await db.ExecuteAsync("DELETE FROM BalancedScorecard WHERE Id=@Id", new { Id = id });
     return rows > 0 ? Results.Ok(new { Message = "删除成功" }) : Results.NotFound();
 });
@@ -625,11 +638,10 @@ app.MapDelete("/api/admin/dste/bsc/{id}", async (HttpContext ctx, int id, IDbCon
 // ==========================================
 
 // ---- 内部助手：统一获取钉钉 AccessToken ----
-static async Task<string?> GetDingTalkAccessTokenAsync(HttpClient client)
+static async Task<string?> GetDingTalkAccessTokenAsync(HttpClient client, IConfiguration config)
 {
-    // 应用配置参数 (正式部署请放到 appsettings.json)
-    string appKey = "ding1dxwr5xfw1isgisq"; // 你的 "大卫" 应用的 Client ID
-    string appSecret = "LjOvkMSnuOfHl7kw1XJ6fmS1UZ_M_gwXxyC3bgj4X-Bz8HoXhn1ACgSDb09ZAyAe";  // 你手动复制的 Client Secret
+    string appKey = config["DingTalk:AppKey"];
+    string appSecret = config["DingTalk:AppSecret"];
 
     string tokenUrl = $"https://oapi.dingtalk.com/gettoken?appkey={appKey}&appsecret={appSecret}";
     var tokenResponse = await client.GetFromJsonAsync<DingTalkTokenResponse>(tokenUrl);
@@ -638,10 +650,10 @@ static async Task<string?> GetDingTalkAccessTokenAsync(HttpClient client)
 }
 
 // ---- 接口20: 获取钉钉 AccessToken 并读取特定文档内容 ----
-app.MapGet("/api/dingtalk/read-doc", async (string documentId, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/read-doc", async (string documentId, IHttpClientFactory httpClientFactory, IConfiguration config) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
 
     if (string.IsNullOrEmpty(accessToken))
     {
@@ -679,10 +691,10 @@ app.MapGet("/api/dingtalk/read-doc", async (string documentId, IHttpClientFactor
 
 // ---- 接口21: [开发者辅助] 自动通过手机号找出该钉钉账户的 UnionId 与 UserId ----
 // 使用场景：传入你在钉钉上绑定的手机号 (比如: mobile=13800138000)
-app.MapGet("/api/dingtalk/get-my-unionid", async (string mobile, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/get-my-unionid", async (string mobile, IHttpClientFactory httpClientFactory, IConfiguration config) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
 
     if (string.IsNullOrEmpty(accessToken)) return Results.BadRequest(new { Message = "获取钉钉Token失败，无法拉取通讯录" });
 
@@ -731,10 +743,10 @@ app.MapGet("/api/dingtalk/get-my-unionid", async (string mobile, IHttpClientFact
 
 // ---- 接口21: 获取企业的知识库(Workspace)列表 --------------------------
 // 新版知识库API需要传入操作人的 operatorId (即该员工的 unionId)
-app.MapGet("/api/dingtalk/workspaces", async (string operatorId, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/workspaces", async (string operatorId, IHttpClientFactory httpClientFactory, IConfiguration config) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
 
     if (string.IsNullOrEmpty(accessToken)) return Results.BadRequest(new { Message = "获取钉钉Token失败" });
 
@@ -762,10 +774,10 @@ app.MapGet("/api/dingtalk/workspaces", async (string operatorId, IHttpClientFact
 
 // ---- 接口22: 获取指定知识库(节点)下的最新文档列表 -------------------------
 // 我们需要 parentNodeId (一般是知识库的 rootNodeId) 来拉取该结构下的文档
-app.MapGet("/api/dingtalk/workspace-nodes", async (string parentNodeId, string operatorId, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/workspace-nodes", async (string parentNodeId, string operatorId, IHttpClientFactory httpClientFactory, IConfiguration config) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
 
     if (string.IsNullOrEmpty(accessToken)) return Results.BadRequest(new { Message = "获取钉钉Token失败" });
 
@@ -793,10 +805,10 @@ app.MapGet("/api/dingtalk/workspace-nodes", async (string parentNodeId, string o
 
 
 // ---- 接口23: 提取全知识库最近一个星期(7天)内新增的文件列表 -------------------------
-app.MapGet("/api/dingtalk/recent-weekly-docs", async (string operatorId, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/recent-weekly-docs", async (string operatorId, IHttpClientFactory httpClientFactory, IConfiguration config) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
 
     if (string.IsNullOrEmpty(accessToken)) return Results.BadRequest(new { Message = "获取钉钉Token失败" });
 
@@ -865,10 +877,10 @@ app.MapGet("/api/dingtalk/recent-weekly-docs", async (string operatorId, IHttpCl
 
 
 // ---- 接口24: 核心闭环！扩展范围：阅读一个月内的更新并防重生成多文档大模型简报 -------------
-app.MapGet("/api/dingtalk/push-strategy-insights", async (string operatorId, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/push-strategy-insights", async (string operatorId, IHttpClientFactory httpClientFactory, IConfiguration config, IDbConnection db) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
 
     if (string.IsNullOrEmpty(accessToken)) return Results.BadRequest(new { Message = "Token 获取失败" });
 
@@ -917,7 +929,7 @@ app.MapGet("/api/dingtalk/push-strategy-insights", async (string operatorId, IHt
                     if (type == "FOLDER") continue;
                     
                     // 过滤二：去重机制 - 验证是否已经被分析并发送过
-                    if (AnalyzedDocIds.Contains(nodeId)) continue; 
+                    if (await db.QueryFirstOrDefaultAsync<int>("SELECT COUNT(1) FROM AnalyzedDocs WHERE DocId = @Id", new { Id = nodeId }) > 0) continue; 
 
                     string? modifiedStr = node["modifiedTime"]?.GetValue<string>();
                     // 过滤三：30天内有过任何新建或修改变动的
@@ -959,11 +971,13 @@ app.MapGet("/api/dingtalk/push-strategy-insights", async (string operatorId, IHt
 
     // 5. 对这些文档标记为已分析防二次重复发
     foreach(var doc in targetDocs) {
-        AnalyzedDocIds.Add((string)doc.Id);
+        await db.ExecuteAsync("INSERT INTO AnalyzedDocs (DocId) VALUES (@Id)", new { Id = (string)doc.Id });
     }
 
     // 6. 整合推送钉钉
-    long agentId = 4401685986; 
+    long.TryParse(config["DingTalk:AgentId"], out long agentId);
+    if (agentId == 0) agentId = 4401685986; 
+
     var msgReq = new HttpRequestMessage(HttpMethod.Post, $"https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2?access_token={accessToken}")
     {
         Content = JsonContent.Create(new {
@@ -997,10 +1011,10 @@ app.MapGet("/api/dingtalk/push-strategy-insights", async (string operatorId, IHt
 
 
 // ---- 接口25: 专区：一周期（7天）全景分类透视，给老板分门别类的汇报！ -------------
-app.MapGet("/api/dingtalk/push-weekly-classified", async (string operatorId, IHttpClientFactory httpClientFactory) => 
+app.MapGet("/api/dingtalk/push-weekly-classified", async (string operatorId, IHttpClientFactory httpClientFactory, IConfiguration config) => 
 {
     var client = httpClientFactory.CreateClient();
-    string? accessToken = await GetDingTalkAccessTokenAsync(client);
+    string? accessToken = await GetDingTalkAccessTokenAsync(client, config);
     if (string.IsNullOrEmpty(accessToken)) return Results.BadRequest("Token 获取失败");
 
     // 1. 获取 UserId
@@ -1067,8 +1081,9 @@ app.MapGet("/api/dingtalk/push-weekly-classified", async (string operatorId, IHt
 
 *(系统基于本周 {allDocs.Count} 项全量文件生成。)*";
 
-    // 4. 发送钉钉
-    long agentId = 4401685986; 
+    // 6. 推送每周战略分类战报到钉钉
+    long.TryParse(config["DingTalk:AgentId"], out long agentId);
+    if (agentId == 0) agentId = 4401685986; 
     var msgReq = new HttpRequestMessage(HttpMethod.Post, $"https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2?access_token={accessToken}")
     {
         Content = JsonContent.Create(new {
@@ -1189,6 +1204,81 @@ app.MapGet("/api/admin/job-status", async (IDbConnection db) => {
 .WithName("GetJobStatus")
 .WithOpenApi();
 
+// ---- 接口29: 随机抽取 5 条聊天记录 (从 Info 表) ----
+app.MapGet("/api/chats/random", async (IDbConnection db) =>
+{
+    string limitsSql = "SELECT MIN(CAST(Uid AS BIGINT)) as MinUid, MAX(CAST(Uid AS BIGINT)) as MaxUid FROM Info";
+    var limits = await db.QueryFirstOrDefaultAsync(limitsSql);
+    if (limits == null || limits.MinUid == null) return Results.Ok(new List<dynamic>());
+    
+    long min = Convert.ToInt64(limits.MinUid);
+    long max = Convert.ToInt64(limits.MaxUid);
+    var rnd = new Random();
+    var results = new List<dynamic>();
+    var seenUids = new HashSet<long>();
+    
+    for (int i = 0; i < 15; i++)
+    {
+        if (results.Count >= 5) break;
+        long randomUid = (long)(rnd.NextDouble() * (max - min) + min);
+        string query = @"
+            SELECT TOP 1 Uid, CAST(ChatHistory AS nvarchar(max)) as ChatHistory 
+            FROM Info 
+            WHERE CAST(Uid AS BIGINT) >= @Uid AND LEN(CAST(ChatHistory AS nvarchar(max))) > 150
+            ORDER BY CAST(Uid AS BIGINT) ASC";
+        var record = await db.QueryFirstOrDefaultAsync<dynamic>(query, new { Uid = randomUid });
+        if (record != null)
+        {
+            long recUid = Convert.ToInt64(record.Uid);
+            if (!seenUids.Contains(recUid))
+            {
+                seenUids.Add(recUid);
+                results.Add(record);
+            }
+        }
+    }
+    return Results.Ok(results);
+})
+.WithName("GetRandomChats")
+.WithOpenApi();
+
+// ---- 接口30-31: 中转查询聊天记录接口 (替代原本的 IIS 反代) ----
+app.MapPost("/api/qwChat/queryChatByStudent", async (HttpRequest req, IHttpClientFactory factory) => 
+{
+    using var reader = new StreamReader(req.Body);
+    var body = await reader.ReadToEndAsync();
+    var client = factory.CreateClient();
+    var res = await client.PostAsync("https://ops.xibojiaoyu.com/xmkp-backend-middle/ops/qwChat/queryChatByStudent", new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+    return Results.Text(await res.Content.ReadAsStringAsync(), "application/json", System.Text.Encoding.UTF8);
+}).WithOpenApi();
+
+app.MapPost("/api/qwChat/queryGroupChatByStudent", async (HttpRequest req, IHttpClientFactory factory) => 
+{
+    using var reader = new StreamReader(req.Body);
+    var body = await reader.ReadToEndAsync();
+    var client = factory.CreateClient();
+    var res = await client.PostAsync("https://ops.xibojiaoyu.com/xmkp-backend-middle/ops/qwChat/queryGroupChatByStudent", new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+    return Results.Text(await res.Content.ReadAsStringAsync(), "application/json", System.Text.Encoding.UTF8);
+}).WithOpenApi();
+
+app.MapPost("/api/orders/query", async (HttpRequest req, IHttpClientFactory factory) => 
+{
+    using var reader = new StreamReader(req.Body);
+    var body = await reader.ReadToEndAsync();
+    var client = factory.CreateClient();
+    var res = await client.PostAsync("https://ops.xibojiaoyu.com/xmkp-backend-middle/ops/diverseInfo/studentOrders/query", new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+    return Results.Text(await res.Content.ReadAsStringAsync(), "application/json", System.Text.Encoding.UTF8);
+}).WithOpenApi();
+
+app.MapPost("/api/orders/queryByTimeRange", async (HttpRequest req, IHttpClientFactory factory) => 
+{
+    using var reader = new StreamReader(req.Body);
+    var body = await reader.ReadToEndAsync();
+    var client = factory.CreateClient();
+    var res = await client.PostAsync("https://ops.xibojiaoyu.com/xmkp-backend-middle/ops/diverseInfo/orders/queryByTimeRange", new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+    return Results.Text(await res.Content.ReadAsStringAsync(), "application/json", System.Text.Encoding.UTF8);
+}).WithOpenApi();
+
 app.UseStaticFiles();
 
 app.Run();
@@ -1202,11 +1292,15 @@ public class DailyDingTalkReporter : BackgroundService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<DailyDingTalkReporter> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly IServiceProvider _serviceProvider;
 
-    public DailyDingTalkReporter(IHttpClientFactory httpClientFactory, ILogger<DailyDingTalkReporter> logger)
+    public DailyDingTalkReporter(IHttpClientFactory httpClientFactory, ILogger<DailyDingTalkReporter> logger, IConfiguration configuration, IServiceProvider serviceProvider)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _configuration = configuration;
+        _serviceProvider = serviceProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -1251,9 +1345,9 @@ public class DailyDingTalkReporter : BackgroundService
     {
         var client = _httpClientFactory.CreateClient();
         
-        string appKey = "ding1dxwr5xfw1isgisq";
-        string appSecret = "LjOvkMSnuOfHl7kw1XJ6fmS1UZ_M_gwXxyC3bgj4X-Bz8HoXhn1ACgSDb09ZAyAe";
-        string unionId = "Sc34ZtfXhBrx0MK0pxtSQQiEiE"; 
+        string appKey = _configuration["DingTalk:AppKey"];
+        string appSecret = _configuration["DingTalk:AppSecret"];
+        string unionId = _configuration["DingTalk:UnionId"];
 
         // 取出 Token
         var tokenRes = await client.GetFromJsonAsync<DingTalkTokenResponse>($"https://oapi.dingtalk.com/gettoken?appkey={appKey}&appsecret={appSecret}");
@@ -1321,7 +1415,9 @@ public class DailyDingTalkReporter : BackgroundService
         }
 
         // 统一向你推送
-        long agentId = 4401685986; 
+        long.TryParse(_configuration["DingTalk:AgentId"], out long agentId);
+        if (agentId == 0) agentId = 4401685986;
+
         var msgReq = new HttpRequestMessage(HttpMethod.Post, $"https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2?access_token={accessToken}")
         {
             Content = JsonContent.Create(new {

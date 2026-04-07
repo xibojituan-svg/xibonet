@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公司级全景利润表 (P&L Dashboard)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --bg: #09090b; --text: #f4f4f5; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 5rem; line-height: 1.6; }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin-block: 1rem; }
+        .markdown-body th, .markdown-body td { border: 1px solid #3f3f46; padding: 12px 16px; text-align: left; }
+        .markdown-body th { background-color: #18181b; font-weight: 700; color: #a78bfa; }
+        .markdown-body tr:nth-child(even) { background-color: rgba(255,255,255,0.02); }
+        .markdown-body h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 1.5rem; background: linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip: text; color: transparent; }
+        .markdown-body h2 { font-size: 1.5rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 1px solid #27272a; padding-bottom: 0.5rem; color: #cbd5e1; }
+        .markdown-body blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; margin-left: 0; background-color: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 4px; }
+        .markdown-body ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 1rem; }
+        .markdown-body li { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body class="px-6">
+    <script src="navbar.js"></script>
+    
+    <div class="max-w-[1200px] mx-auto mt-12 bg-[#09090b] border border-gray-800 rounded-2xl shadow-2xl p-8 lg:p-12">
+        <a href="financial_ue_dashboard.html" class="inline-block mb-6 text-gray-400 hover:text-white transition">
+            <i class="fas fa-arrow-left mr-2"></i> 返回单客 UE 罗盘
+        </a>
+        
+        <div id="content" class="markdown-body"></div>
+    </div>
+
+    <script>
+        const rawMd = `# 📊 喜播 2026 年度全景利润表 (基于 3.30 会议 1亿净利目标定稿)\n\n> [!NOTE]\n> 本报告由 AI 自动从 \`2026年盈利测算(业务沟通版3.30）.xlsx\` 核心工作表中提取，涵盖大盘年度成本摊销与全业务线净利测算。单位通常为“万元”。\n\n## 1. 核心战略 SKUs P&L 漏斗 (FY26预测 1亿版)\n分析总结：写作线与短视频构成 AI 大区核心弹药，有声线依旧承载总盘现金流护城河基地。\n\n|FY26|Unnamed: 11|Unnamed: 12|Unnamed: 13|Unnamed: 14|Unnamed: 15|\n|---|---|---|---|---|---|\n||合计|有声线|AI线合计|AI短视频|AI写作|\n|总收入|65044.9795726866|50044.9795726866|15000|6000|9000|\n|首购净收入|41924.34826324|34124.34826324|7800|4200|3600|\n|获客费用|22021.12073|17461.12073|4560|2436|2124|\n|运营成本|9554.869652648|6824.869652648|2730|1470|1260|\n|首购变动利润|10348.357880592|9838.357880592|510|294|216|\n|复购净收入|23120.6313094466|15920.6313094466|7200|1800|5400|\n|运营成本|13121.3997753642|10601.3997753642|2520|630|1890|\n|复购变动利润|9999.2315340824|5319.2315340824|4680|1170|3510|\n|综合变动利润|20347.5894146744|15157.5894146744|5190|1464|3726|\n|固定成本|10200|7847.78156584667|2352.21843415333|940.887373661331|1411.331060492|\n|营业利润|10147.5894146744|7309.80784882772|2837.78156584667|523.112626338669|2314.668939508|\n|所得税|0|0|0|0|0|\n|净利润|10147.5894146744|7309.80784882772|2837.78156584667|523.112626338669|2314.668939508|\n|净利率|0.156008803159584|0.146064758368235|0.189185437723112|0.0871854377231115|0.257185437723112|\n\n\n## 2. P&L 财务总平账面板 (F26 总体固定成本与摊派)\n分析洞察：产研大模型费用与企业整体行政固定用工成本统包。营业利润率的健康度必须通过后端复购支撑。\n\n|Part 1：F26预算结果汇总|Unnamed: 1|Unnamed: 2|Unnamed: 3|Unnamed: 4|Unnamed: 5|Unnamed: 6|Unnamed: 7|Unnamed: 8|Unnamed: 9|Unnamed: 10|Unnamed: 11|Unnamed: 12|Unnamed: 13|Unnamed: 14|Unnamed: 15|Unnamed: 16|Unnamed: 17|Unnamed: 18|\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n|单位：万元|F26预算 vs F25年实际||||||收入结构/费用比例||||||||||||\n|F26喜播集团预算|F25A|F26B (业务)|F26-3-10|F26-2|F26B  (财务上版)|YOY|F25A|F26E|备注||||||||||\n|收入（按产品线）|95816.6019655142|60835.74763955|920|2169|79981.2763183712|-0.365081349248373|1|1|||||||||||\n|有声线|88653.661474618|41121.1981322424|563|1500|54025.1374000482|-0.536159054817881|0.925243221488127|0.675938074697205|占收入比||||||||||\n|AI产品线(视频&写作)|6708.75949089623|13565.6500266717|322|586|16994.9666681894|1.02208024375896|0.0700166709450916|0.222988136959338|||||||||||\n|IP孵化(张震&其它孵化)|454.181|5148.89948063585|35|83|7961.17225013358|10.336668598281|0.00474010756678124|0.0846360845459306|||||||||||\n|健康业务线|0|1000|||1000||0|0.0164377037975266||第二曲线：商业模式系会员模式，F26年目标：初步跑通模型，营收1,000万，利润|||||||||\n|UE（按产品线）|32370.3691324341|13288.0504432227|||24004.4818268517|-0.589499570151379|0.337836747165013|0.218425037232287|||||||||||\n|有声线|30315.0651790043|9325.90975191183|||16487.397298195|-0.692367154850428|0.341949386802074|0.22679080803824|各业务线UE率||||||||||\n|AI线(视频&写作)|1863.7117334298|3099.23601733661|||5160.72833432314|0.662937439167728|0.277802734761748|0.228462035453011|||||||||||\n|IP孵化(含张震)|191.59222|862.904673974302|||2356.35619433358|3.5038607203064|0.421841116206975|0.167590118474743|||||||||||\n|健康业务线|0|0|||0|||0|||||||||||\n\n\n### 💡 CFO 财务深度分析建议 (FBP 模型测算结果)\n1. **现金基盘防御**：从数据盘看，首购的 \`变动利润\` 在多线中均呈现极低利润乃至被成本侵蚀状态，这意味着前端引流买量环境极度内卷，必须坚决执行以 **COC (单客履约)/后端续费** 作为唯一的利润突破口。\n2. **AI线长尾爆发矩阵**：净利润破亿的命门完全押注于“AI写作营与视频营”随后的高客单伴跑与代发分账体系。建议立刻将前线打单提成，与学员“是否退费”及“是否在一个月后开启复购”完全挂钩。\n`;
+        document.getElementById('content').innerHTML = marked.parse(rawMd);
+    </script>
+</body>
+</html>
